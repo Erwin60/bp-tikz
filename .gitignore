@@ -1,0 +1,28 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+*.run.xml
+*.bcf
+
+# Generated tool outputs (regenerate from CSV as needed)
+bp_diagrams.tex
+bp_diagrams_both_onepage_standalone.tex
+bp_diagrams_standalone_two_sides.tex
+bp_daily_stats.csv
+bp_weekly_stats.csv
+
+# OS / editor
+.DS_Store
+*.swp
+__pycache__/
+*.pyc
+
+# Texifier / TeXpad intermediate
+*.texpadtmp/

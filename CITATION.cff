@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "bp-tikz: Blood-Pressure Diagram Generator (generate_bp_tikz.py, generate_bp_daytime_tikz.py)"
+abstract: >-
+  A command-line toolkit that converts a CSV of home blood-pressure (HBPM)
+  readings into LaTeX/PGFPlots diagrams. The main tool (generate_bp_tikz.py)
+  produces a daily course and a block/weekly overview using a two-stage
+  aggregation (per calendar day, then fixed-length blocks), with a choice of
+  calendar-day-weighted mean or median-of-daily-medians central line and
+  configurable outlier marking. A companion tool (generate_bp_daytime_tikz.py)
+  analyzes time-of-day and weekday patterns (Morning/Midday/Evening blocks) with
+  median bars, IQR bands, ESC orientation corridors, an hour-of-day measurement
+  histogram, and Tukey outlier markers, in color or black-and-white.
+type: software
+authors:
+  - family-names: Grabler
+    given-names: Erwin
+    affiliation: "ARTCOM Vienna, Vienna, Austria"
+keywords:
+  - blood pressure
+  - HBPM
+  - time series
+  - aggregation
+  - median
+  - interquartile range
+  - LaTeX
+  - PGFPlots
+  - TikZ
+  - reproducibility
+  - time of day
+  - circadian
+license: MIT
+version: "1.2.0"
+date-released: "2026-06-24"
+repository-code: "https://github.com/Erwin60/bp-tikz"

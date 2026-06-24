@@ -1,0 +1,516 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+
+\definecolor{lstbg}{gray}{0.96}
+\definecolor{lstkw}{rgb}{0.10,0.10,0.55}
+\definecolor{lstcm}{rgb}{0.30,0.45,0.30}
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  backgroundcolor=\color{lstbg},
+  keywordstyle=\color{lstkw}\bfseries,
+  commentstyle=\color{lstcm}\itshape,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framesep=3pt,
+  rulecolor=\color{gray!40},
+  xleftmargin=2pt,
+  showstringspaces=false,
+  postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
+}
+\lstdefinestyle{sh}{language=bash}
+
+\newcommand{\param}[1]{\texttt{#1}}
+
+\begin{document}
+
+\title{Reproducible Processing of Home Blood-Pressure Time Series:\\
+Methodology and Operation of the Generator \texttt{generate\_bp\_tikz.py}}
+
+\author{%
+\IEEEauthorblockN{Erwin Grabler}
+\IEEEauthorblockA{ARTCOM Vienna, Vienna, Austria\\
+\texttt{OE1EKG}}}
+
+\maketitle
+
+\begin{abstract}
+Home blood-pressure monitoring (HBPM) typically produces an irregularly sampled
+time series: several readings on some days, none on others. A naive average over
+all individual readings therefore over-weights measurement-intensive days and
+distorts the overall picture. This document describes the methodology and
+operation of \texttt{generate\_bp\_tikz.py}, a command-line tool that turns a
+simple CSV file into two coordinated LaTeX/PGFPlots diagrams and
+machine-readable statistics CSVs. The core principle is a two-stage
+aggregation: first by calendar day, then optionally into fixed-length blocks.
+We explain the computation variants (calendar-day-weighted mean versus median of
+daily medians), the outlier logic, and the generated data formats, and we
+document every parameter in tabular form. The goal is a reproducible,
+transparent, and clinically interpretable representation that explicitly shows
+comparison thresholds without implying aneurysm- or patient-specific target
+values.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Blood pressure, HBPM, time series, aggregation, median, interquartile range,
+LaTeX, PGFPlots, reproducibility.
+\end{IEEEkeywords}
+
+\section{Introduction and Motivation}
+Self-measurement of blood pressure at home yields an irregularly sampled time
+series spanning weeks or months. Two methodological problems recur. First, the
+number of readings per day varies strongly; a day with eight readings would be
+weighted eight times as heavily as a day with a single reading in a naive
+overall average. Second, real HBPM data contain individual strongly deviating
+values (for example immediately after physical exertion) that affect robust and
+non-robust location measures differently.
+
+\texttt{generate\_bp\_tikz.py} addresses both points through a deterministic,
+parameterizable pipeline. The input is a CSV file; the output consists of a
+fragment that can be included in an existing LaTeX document, two standalone
+documents, and two optional statistics CSVs. All location and dispersion
+measures are computed explicitly and traceably in the source, so the figures can
+be checked directly against the underlying numbers.
+
+\section{Data Model and Input}
+A CSV file is expected with at least the columns \emph{Date}, \emph{Systolic},
+and \emph{Diastolic}; optional columns \emph{Pulse}, \emph{Time}, and
+\emph{Note} are recognized and evaluated where useful. Column detection uses
+alias names in German and English (e.g.\ \texttt{date}/\texttt{datum},
+\texttt{systolic}/\texttt{systolisch}), with case and special characters
+normalized.
+
+Dates are accepted in the formats \texttt{YYYY-MM-DD}, \texttt{DD.MM.YYYY},
+\texttt{DD.MM.YY}, \texttt{DD/MM/YYYY}, and \texttt{DD/MM/YY}. Numeric values are
+parsed in both English and European notation: values such as \texttt{130},
+\texttt{130.5}, \texttt{130,5}, \texttt{1.234,56}, and \texttt{1,234.56} are
+interpreted correctly by treating the last separator that occurs as the decimal
+separator. Non-numeric suffixes such as ``mmHg'' are tolerated. The input
+delimiter is auto-detected by default (comma, semicolon, or tab) and can be
+forced with \param{-{}-delimiter}.
+
+On input, only rows within the chosen date window (\param{-{}-date-from} through
+optional \param{-{}-date-to}) are accepted. Missing or invalid systolic or
+diastolic values cause a clear error abort with the row number, rather than
+silently producing corrupted statistics.
+
+\section{Aggregation Methodology}
+
+\subsection{Stage 1: Aggregation per Calendar Day}
+In the first step, all readings of a calendar day are combined into a daily
+statistic. For systolic and diastolic pressure as well as for the derived pulse
+pressure (the difference between systolic and diastolic), the minimum, maximum,
+median, and arithmetic mean are determined; analogously for pulse, if present.
+This daily reduction is the decisive step against over-weighting
+measurement-intensive days: regardless of whether a day contains one or eight
+readings, it subsequently enters the further computations as \emph{one} daily
+value.
+
+The daily diagram (Figure~1 of the output) shows the daily median as a point and
+the daily range (minimum to maximum) as a vertical bar for each day. Days with
+only one reading therefore have no visible range. The median is preferred over
+the mean here because, within a day, it is robust against a single outlier and,
+together with the displayed range, captures both the typical level and the
+dispersion of the day.
+
+\subsection{Stage 2: Block Aggregation}
+In the second step, the daily values are grouped into blocks of fixed length
+(default seven days, configurable via \param{-{}-block-days}). Block boundaries
+are counted from \param{-{}-date-from}, so the first block starts independently
+of the weekday. The last block may be shorter; the caption explicitly notes when
+it comprises fewer days and is therefore less robust.
+
+For each block, two distinct quantities are computed and deliberately displayed
+separately in the diagram:
+\begin{itemize}
+\item the \emph{central line} as the block's location measure, and
+\item the \emph{interquartile range (IQR)} of the daily medians as a dispersion
+measure, drawn as an error bar from $Q_1$ to $Q_3$.
+\end{itemize}
+The quartiles are determined by linear interpolation of the sorted daily
+medians, comparable to the default of common statistical packages.
+
+\section{Computation Variants of the Central Line}
+The central methodological decision concerns the location measure of the block
+central line. The tool offers two variants via \param{-{}-week-central}, each
+serving a clear purpose.
+
+\subsection{Mean (Default)}
+In the default (\texttt{mean}), the central line is the calendar-day-weighted
+mean of the daily means. Formally, for a block with $D$ days and daily means
+$\bar{x}_d$:
+\begin{equation}
+\mu_{\mathrm{block}} = \frac{1}{D}\sum_{d=1}^{D} \bar{x}_d .
+\end{equation}
+Since $\bar{x}_d$ is already the mean of the readings of day $d$,
+$\mu_{\mathrm{block}}$ is a two-stage, day-equal-weighted mean. This variant is
+compatible with the clinically common HBPM/ESC mean thresholds, which are also
+based on means, and is therefore suitable for direct comparison with such
+thresholds.
+
+\subsection{Median of Daily Medians}
+With \texttt{median}, the central line is the median of the block's daily
+medians:
+\begin{equation}
+m_{\mathrm{block}} = \operatorname{median}\bigl(\{\tilde{x}_d\}_{d=1}^{D}\bigr),
+\end{equation}
+where $\tilde{x}_d$ is the median of day $d$. This variant is more robust
+against individual outlier days and is also consistent with the displayed IQR
+box, since both are based on the same daily medians. It is recommended when the
+typical level should be shown despite occasional exertion spikes.
+
+\subsection{Recommendation}
+The choice is not a matter of right or wrong but of purpose: for comparison with
+mean-based thresholds, \texttt{mean} is natural; for an outlier-robust trend
+display, \texttt{median}. Because dispersion (IQR box) and location are shown
+separately, the information remains fully visible in both cases.
+
+\section{Outlier Marking}
+Optionally (\param{-{}-week-outliers}), the weekly diagram marks individual days
+whose daily median exceeds or falls below a clinical threshold as small points
+next to the respective IQR marker. The upper thresholds default to 135\,mmHg
+systolic and 85\,mmHg diastolic, matching the HBPM comparison lines drawn in the
+diagram; they are adjustable via \param{-{}-week-outlier-sys-hi} and
+\param{-{}-week-outlier-dia-hi}. Additionally, optional \emph{lower} thresholds
+can be activated via \param{-{}-week-outlier-sys-lo} and
+\param{-{}-week-outlier-dia-lo}, for example to reveal days that are too low
+under therapy. This marking does not replace a statistical outlier definition
+but highlights clinically interesting individual days without removing them from
+the aggregation; all days remain included in mean, median, and IQR.
+
+\section{Reference Elements and Thresholds}
+Both diagrams contain the same reference elements, explained once in a shared
+paragraph and referenced by the captions. The light-gray corridors
+120--129\,mmHg systolic and 70--79\,mmHg diastolic are general ESC orientations
+under therapy subject to individual tolerability and are explicitly \emph{not}
+aneurysm-specific target lines. The dotted lines at 135\,mmHg systolic and
+85\,mmHg diastolic mark frequently used home comparison thresholds. This
+deliberate separation between comparison threshold and individual therapy target
+prevents the figure from implying an unsupported, patient-specific target line.
+
+The automatic summary line at the bottom of the daily diagram states the
+day-weighted mean, the median of daily medians, and the number of days with a
+daily mean below 135/85\,mmHg. It can be suppressed with
+\param{-{}-no-daily-summary-label}.
+
+\section{Generated Files}
+By default, the tool writes an includable LaTeX fragment (\param{-{}-out}), a
+single-page standalone document with both diagrams stacked
+(\param{-{}-standalone-out}), and a ``two-sides'' standalone document in which
+each diagram occupies its own tightly cropped page (\param{-{}-two-sides-out}).
+Optionally, two statistics CSVs are written (\param{-{}-daily-stats},
+\param{-{}-weekly-stats}). The single-page document scales the diagram heights at
+typesetting time from the available page height, so the page is always fully
+used regardless of the length of the captions.
+
+Tables~\ref{tab:daily_cols} and~\ref{tab:weekly_cols} document the columns of the
+two statistics CSVs.
+
+\begin{table}[!t]
+\caption{Columns of the daily-statistics CSV (\texttt{-{}-daily-stats}).}
+\label{tab:daily_cols}
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\columnwidth} >{\raggedright\arraybackslash}p{0.58\columnwidth}}
+\toprule
+\textbf{Column} & \textbf{Meaning} \\
+\midrule
+\texttt{date} & calendar day (ISO 8601) \\
+\texttt{day\_index} & day index from \texttt{date-from} (0-based) \\
+\texttt{n} & number of readings on this day \\
+\texttt{sys\_min/max} & systolic minimum/maximum \\
+\texttt{sys\_median} & systolic daily median \\
+\texttt{sys\_mean} & systolic daily mean \\
+\texttt{dia\_min/max} & diastolic minimum/maximum \\
+\texttt{dia\_median} & diastolic daily median \\
+\texttt{dia\_mean} & diastolic daily mean \\
+\texttt{pulse\_*} & pulse min/max/median/mean (if present) \\
+\texttt{pulse\_pressure\_*} & pulse pressure min/max/median/mean \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!t]
+\caption{Columns of the block-statistics CSV (\texttt{-{}-weekly-stats}).}
+\label{tab:weekly_cols}
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.40\columnwidth} >{\raggedright\arraybackslash}p{0.48\columnwidth}}
+\toprule
+\textbf{Column} & \textbf{Meaning} \\
+\midrule
+\texttt{block} & block index (0-based) \\
+\texttt{start\_date}, \texttt{end\_date} & block start/end \\
+\texttt{x\_mid} & x position (day index) of block center \\
+\texttt{n\_days} & number of days in the block \\
+\texttt{n\_readings} & number of readings in the block \\
+\texttt{label} & block axis label \\
+\texttt{sys\_mean\_of\_daily\_means} & weighted systolic mean \\
+\texttt{sys\_q1/q3\_daily\_medians} & systolic $Q_1$/$Q_3$ of daily medians \\
+\texttt{dia\_mean\_of\_daily\_means} & weighted diastolic mean \\
+\texttt{dia\_q1/q3\_daily\_medians} & diastolic $Q_1$/$Q_3$ of daily medians \\
+\texttt{pulse\_pressure\_*} & analogous for pulse pressure \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Anonymized Application Example}
+Figures~\ref{fig:daily} and~\ref{fig:weekly} show the two generated diagrams on
+an anonymized, realistic data set (101 readings on 37 calendar days). The figure
+labels are produced by the tool in German; an English gloss is given in the
+captions. Figure~\ref{fig:daily} is the daily course with daily median, daily
+range, the automatic summary line, and the \texttt{n=} labels (readings per
+day). Figure~\ref{fig:weekly} is the condensed 7-day overview; here the median
+central line (\param{-{}-week-central median}) and outlier marking
+(\param{-{}-week-outliers}) were chosen. In both figures the ESC corridors and
+HBPM comparison lines are drawn as a shared reference.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.92\textwidth]{fig1.pdf}
+\caption{Anonymized example, daily course. Points show the daily median,
+vertical bars the daily range (min--max); gray \texttt{n=} labels at the top
+give the readings per day. Summary line glosses: \emph{Tage seit}~=~days since;
+\emph{Mittelwert}~=~mean; \emph{Median}; \emph{Tage}~=~days;
+\emph{Blutdruck}~=~blood pressure.}
+\label{fig:daily}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.92\textwidth]{fig2.pdf}
+\caption{Anonymized example, 7-day overview with median central line and outlier
+marking. Lines show the median of daily medians, error bars the interquartile
+range of daily medians; circles mark individual days whose daily median exceeds
+the threshold (135/85\,mmHg). Legend glosses: \emph{IQR der Tagesmediane}~=~IQR
+of daily medians; \emph{7-Tage-Median}~=~7-day median;
+\emph{Ausrei{\ss}er-Tage}~=~outlier days; \emph{HBPM-Vergleich}~=~HBPM
+comparison.}
+\label{fig:weekly}
+\end{figure*}
+
+Figure~\ref{fig:onepage} additionally shows the single-page standalone document
+(\param{-{}-standalone-out}), in which both diagrams, the shared reference
+paragraph, and the captions are combined on one page. The diagram heights are
+computed at typesetting time from the available page height, so the page is fully
+used regardless of the caption length.
+
+\begin{figure}[!t]
+\centering
+\fbox{\includegraphics[width=0.97\columnwidth]{fig3.pdf}}
+\caption{Anonymized example of the single-page standalone document
+(\texttt{-{}-standalone-out}): both diagrams, the shared reference paragraph, and
+the captions on one page, with the diagrams scaled to the page height. The figure
+labels are produced by the tool in German; see Figures~\ref{fig:daily}
+and~\ref{fig:weekly} for English glosses of the recurring terms.}
+\label{fig:onepage}
+\end{figure}
+
+Finally, Figure~\ref{fig:twosides} shows the two-sides variant
+(\param{-{}-two-sides-out}), in which each diagram occupies its own tightly
+cropped page and the corresponding caption is set as a text node below the axis.
+This format is particularly suited to embedding the individual diagrams as
+separate appendix figures.
+
+\begin{figure*}[!t]
+\centering
+\begin{subfigure}{0.48\textwidth}
+\centering
+\fbox{\includegraphics[width=\textwidth]{fig4a.pdf}}
+\caption{Page 1: daily course.}
+\label{fig:twosides_a}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.48\textwidth}
+\centering
+\fbox{\includegraphics[width=\textwidth]{fig4b.pdf}}
+\caption{Page 2: 7-day overview.}
+\label{fig:twosides_b}
+\end{subfigure}
+\caption{Anonymized example of the two-sides variant
+(\texttt{-{}-two-sides-out}): each diagram occupies its own cropped page with the
+caption set as a node below the axis. The figure labels are produced by the tool
+in German; see Figures~\ref{fig:daily} and~\ref{fig:weekly} for English glosses.}
+\label{fig:twosides}
+\end{figure*}
+
+\section{Parameter Reference}
+Table~\ref{tab:params} lists all command-line parameters with default and
+purpose.
+
+\begin{table*}[!t]
+\caption{Complete parameter reference of \texttt{generate\_bp\_tikz.py}.}
+\label{tab:params}
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.24\textwidth} >{\raggedright\arraybackslash}p{0.16\textwidth} >{\raggedright\arraybackslash}p{0.52\textwidth}}
+\toprule
+\textbf{Parameter} & \textbf{Default} & \textbf{Purpose} \\
+\midrule
+\param{-{}-csv} & --- (required) & Input CSV with date, systolic, diastolic (optional time/pulse/note). \\
+\param{-{}-date-from} & --- (required) & First date in the evaluation window. \\
+\param{-{}-date-to} & all from \texttt{date-from} & Last date; if omitted, all subsequent values. \\
+\param{-{}-out} & \texttt{bp\_diagrams.tex} & Path of the includable LaTeX fragment. \\
+\param{-{}-daily-stats} & off & Optional daily statistics as CSV. \\
+\param{-{}-weekly-stats} & off & Optional block statistics as CSV. \\
+\param{-{}-block-days} & \texttt{7} & Block length of the second aggregation stage, in days. \\
+\param{-{}-delimiter} & \texttt{auto} & Delimiter: \texttt{auto}/\texttt{comma}/\texttt{semicolon}/\texttt{tab}. \\
+\param{-{}-standalone-out} & \texttt{bp\_\hspace{0pt}diagrams\_\hspace{0pt}both\_\hspace{0pt}onepage\_\hspace{0pt}standalone.tex} & Single-page standalone with both diagrams. \\
+\param{-{}-no-standalone} & off & Do not write the single-page standalone. \\
+\param{-{}-standalone-title} & \texttt{Blutdruckdiagramme} & Title above the standalone diagrams. \\
+\param{-{}-show-daily-n} & off & Gray \texttt{n=} labels (readings per day) in the daily diagram. \\
+\param{-{}-daily-n-y} & automatic & Fixed y position of the \texttt{n=} labels. \\
+\param{-{}-week-outliers} & off & Mark outlier days in the weekly diagram. \\
+\param{-{}-week-outlier-sys-hi} & \texttt{135.0} & Upper systolic outlier threshold (mmHg). \\
+\param{-{}-week-outlier-dia-hi} & \texttt{85.0} & Upper diastolic outlier threshold (mmHg). \\
+\param{-{}-week-outlier-sys-lo} & off & Optional lower systolic threshold. \\
+\param{-{}-week-outlier-dia-lo} & off & Optional lower diastolic threshold. \\
+\param{-{}-week-central} & \texttt{mean} & Central line: \texttt{mean} (weighted mean) or \texttt{median} (median of daily medians). \\
+\param{-{}-no-daily-summary-label} & off & Suppress the automatic summary line in the daily diagram. \\
+\param{-{}-two-sides-out} & \texttt{bp\_\hspace{0pt}diagrams\_\hspace{0pt}standalone\_\hspace{0pt}two\_\hspace{0pt}sides.tex} & Two-sides standalone (one cropped page per diagram). \\
+\param{-{}-no-two-sides} & off & Do not write the two-sides standalone. \\
+\param{-{}-two-sides-width-cm} & \texttt{16.0} & Fixed axis width (cm) of the two-sides variant. \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Operation}
+\subsection{Prerequisites}
+The including LaTeX document requires:
+\begin{lstlisting}[style=sh]
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\end{lstlisting}
+The script itself has no external Python dependencies beyond the standard
+library.
+
+\subsection{Minimal Call}
+\begin{lstlisting}[style=sh]
+python3 generate_bp_tikz.py \
+  --csv bp_raw.csv \
+  --date-from 2026-05-15
+\end{lstlisting}
+Produces the fragment and both standalone documents with default names.
+
+\subsection{With Date Window and Statistics Export}
+\begin{lstlisting}[style=sh]
+python3 generate_bp_tikz.py \
+  --csv bp_raw.csv \
+  --date-from 15.05.2026 \
+  --date-to 20.06.2026 \
+  --out bp_fragment.tex \
+  --daily-stats bp_daily_stats.csv \
+  --weekly-stats bp_weekly_stats.csv
+\end{lstlisting}
+
+\subsection{Median Central Line with Outliers}
+\begin{lstlisting}[style=sh]
+python3 generate_bp_tikz.py \
+  --csv bp_raw.csv \
+  --date-from 2026-05-15 \
+  --week-central median \
+  --week-outliers
+\end{lstlisting}
+
+\subsection{Fully Specified Call}
+\begin{lstlisting}[style=sh]
+python3 generate_bp_tikz.py \
+  --csv bp_raw.csv \
+  --date-from 2026-05-15 \
+  --date-to 2026-06-20 \
+  --week-central median --week-outliers \
+  --week-outlier-sys-hi 135 \
+  --week-outlier-dia-hi 85 \
+  --show-daily-n \
+  --out bp_fragment.tex \
+  --standalone-out bp_onepage.tex \
+  --two-sides-out bp_two_sides.tex \
+  --two-sides-width-cm 16 \
+  --daily-stats bp_daily_stats.csv \
+  --weekly-stats bp_weekly_stats.csv
+\end{lstlisting}
+
+\subsection{Including the Output}
+The fragment is included in running text with \verb|\input{bp_fragment.tex}|.
+Alternatively, the single-page or two-sides standalone can be compiled
+separately and the resulting PDF embedded as an appendix figure.
+
+\section{Reproducibility and Validation}
+Since all location and dispersion measures are computed explicitly in the source
+and output via the statistics CSVs, the figures can be checked directly against
+the numbers. A typical validation step is to compare the summary line of the
+daily diagram (weighted mean, median of daily medians, number of days below
+135/85\,mmHg) with the values in the daily-statistics CSV. The same input, the
+same date window, and the same parameters lead deterministically to identical
+output.
+
+\section{Implementation and Tested Environment}
+The tool is implemented in Python~3 and uses only the standard library (no
+third-party dependencies); Python~3.9 or newer is recommended. The generated
+documents were typeset with \texttt{pdflatex} (TeX~Live) using \texttt{tikz} and
+\texttt{pgfplots} (\texttt{compat=1.18}); the accompanying IEEE papers use
+\texttt{IEEEtran.cls} version~V1.8b.
+
+Testing was performed \emph{only} on the following platforms: (i)~macOS with
+desktop Python and a desktop TeX~Live/MacTeX installation; (ii)~iPad and iPhone
+with \emph{a-Shell}, a local iOS terminal that bundles Python~3 and TeX~Live
+(with TikZ and LuaTeX) -- both the script and the LaTeX compilation run
+on-device; and (iii)~\emph{Texifier} (formerly TeXpad) on macOS and iPadOS/iOS
+for editing and typesetting the LaTeX documents. Note that Texifier's built-in
+live typesetter (TexpadTeX) runs in a sandbox and does not permit shell-escape
+(\texttt{\textbackslash write18}); the Python script itself is therefore run in
+a-Shell or an ordinary shell, while Texifier is used to typeset the generated
+\texttt{.tex} files. Other platforms (Windows, Linux) are expected to work with a
+standard Python~3 and TeX~Live installation but have not been tested.
+
+\section{Limitations}
+The tool is a processing and visualization tool, not a diagnostic system. The
+thresholds drawn are comparison and orientation lines; the determination of
+individual target values rests with the treating physician. The expressiveness
+of short blocks with few days is limited and is marked accordingly in the
+caption. The outlier marking is a threshold-based highlighting and not a
+statistical outlier classification.
+
+\section{Summary}
+\texttt{generate\_bp\_tikz.py} converts irregularly sampled HBPM time series via
+a two-stage aggregation into two coordinated, reproducible diagrams. The
+separate display of location (mean or median) and dispersion (range or IQR), the
+transparent outlier logic, and the explicit separation of comparison threshold
+and therapy target enable a clinically interpretable yet traceable
+representation. Full parameterization via the command line makes the tool
+suitable both for one-off evaluations and for recurring, automated reports.
+
+\section*{Acknowledgment and Disclosure of Generative AI Use}
+In accordance with the IEEE guidelines on the use of AI-generated content, the
+following is disclosed. The AI system Claude (Anthropic) was used in the
+preparation of this document. The AI was used in an assistive capacity for: the
+linguistic drafting and structuring of the running text; the formulation of the
+methodology description based on the source code developed by the author; the
+creation of the LaTeX and table structure; and the preparation of the anonymized
+example figures. The conception, software, underlying data, technical claims, and
+final responsibility for the content rest entirely with the author; all
+AI-assisted contributions were reviewed, verified, and corrected where necessary
+by the author. The AI is not an author of this work. A more detailed description
+of the AI contribution is provided in the file \texttt{AI\_USAGE.md} of the
+accompanying repository.
+
+\end{document}
