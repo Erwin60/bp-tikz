@@ -30,6 +30,6 @@ keywords:
   - time of day
   - circadian
 license: MIT
-version: "1.2.0"
-date-released: "2026-06-24"
-repository-code: "https://github.com/Erwin60/bp-tikz"
+version: "1.2.1"
+date-released: "2026-06-25"
+repository-code: "https://github.com/USERNAME/bp-tikz"

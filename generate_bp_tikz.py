@@ -561,8 +561,16 @@ def xticks_for_daily(daily: Sequence[DailyStats]) -> Tuple[str, str]:
     else:
         step = max(1, round(max_day / 5))
         ticks = list(range(0, max_day + 1, step))
+        # Ensure the most recent day is labelled at the right edge. If the last
+        # regular tick is not max_day, append it -- but only if it is far enough
+        # from the previous tick, otherwise the two date labels overlap (e.g.
+        # ticks 40 and 41 -> "24.0625.06"). When too close (< half a step), drop
+        # the last regular tick and use max_day instead.
         if ticks[-1] != max_day:
-            ticks.append(max_day)
+            if max_day - ticks[-1] < max(1, step / 2):
+                ticks[-1] = max_day
+            else:
+                ticks.append(max_day)
     labels = []
     date_by_index = {d.day_index: d.d for d in daily}
     # If a tick has no exact reading date, label by date_from + offset using first date as baseline.

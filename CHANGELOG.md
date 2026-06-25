@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-06-25
+
+### Fixed
+- `generate_bp_tikz.py`: x-axis date labels on the daily chart could overlap at
+  the right edge when the most recent day fell just after a regular tick (e.g.
+  ticks 40 and 41 printed "24.0625.06"). The final tick is now replaced by the
+  most recent day instead of appended when the gap is smaller than half a tick
+  step, so the latest date is still labelled but never collides. Applies to both
+  the one-page and two-sides standalone layouts.
+
 ## [1.2.0] - 2026-06-24
 
 ### Added
