@@ -538,7 +538,7 @@ def build_hour_histogram(rows, st, morning_end, midday_end):
         if not c:
             continue
         series.append(
-            rf"\addplot[ybar,bar width=5pt,{st['bar'][b]}] coordinates {{{c}}};"
+            rf"\addplot[ybar,bar width=5pt,bar shift=0pt,{st['bar'][b]}] coordinates {{{c}}};"
             + "\n" + rf"\addlegendentry{{{block_labels_hist[b]}}}"
         )
     series_tex = "\n".join(series)
@@ -554,7 +554,7 @@ def build_hour_histogram(rows, st, morning_end, midday_end):
     return rf"""\begin{{tikzpicture}}
 \begin{{axis}}[
     width=0.86\textwidth, height=4.2cm,
-    ybar, bar width=5pt,
+    ybar, bar width=5pt, bar shift=0pt,
     xmin=-0.6, xmax=23.6, ymin=0, ymax={ymax},
     xtick={{0,2,4,6,8,10,12,14,16,18,20,22}},
     xticklabel style={{font=\scriptsize}},

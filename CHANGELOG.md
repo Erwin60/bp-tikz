@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.2] - 2026-06-25
+
+### Fixed
+- `generate_bp_daytime_tikz.py`: bars in the hour-of-day histogram (Figure 1b)
+  were shifted off their tick positions by roughly half a unit. With three
+  `\addplot` bar series, PGFPlots applies an automatic group `bar shift`, so each
+  bar no longer sat centred above its hour. Added `bar shift=0pt` (the three
+  blocks cover disjoint hours and need no grouping offset), so every bar is now
+  centred exactly over its hour tick.
+
 ## [1.2.1] - 2026-06-25
 
 ### Fixed
