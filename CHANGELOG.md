@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.3] - 2026-06-26
+
+### Changed
+- Regenerated the main-tool example figures (`examples/fig1.pdf` … `fig4b.pdf`)
+  from the current scripts so they include the v1.2.1 x-axis date-label fix.
+  `fig3.pdf` is the one-page standalone, `fig4a/b.pdf` the two-sides layout.
+- Rebuilt the documentation PDFs (`docs/bp_tikz_doc_DE.pdf`, `…_EN.pdf`) with the
+  refreshed figures.
+
+### Added
+- Daytime manuals (`docs/Manual_Daytime_DE.md`, `…_EN.md`): an "example output"
+  section linking the `fig_weekday_daytime_*` example PDFs, mirroring how the
+  main-tool documentation references its examples.
+
 ## [1.2.2] - 2026-06-25
 
 ### Fixed

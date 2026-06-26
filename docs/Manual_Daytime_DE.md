@@ -34,6 +34,19 @@ Messverteilung je Block). Die Datenlage-Hinweise sind datengetrieben: Sie nennen
 automatisch den schwächsten Block und wechseln zu einer „gleichmäßig abgedeckt"-
 Formulierung, sobald die Belegung ausgewogen ist.
 
+### Beispielausgabe
+
+Aus der anonymisierten Beispiel-CSV (`examples/bp_anon_example.csv`) erzeugte
+Beispieldokumente liegen im Ordner `examples/`:
+
+- [`examples/fig_weekday_daytime_bw.pdf`](../examples/fig_weekday_daytime_bw.pdf)
+  — Schwarz-Weiß-Variante (`--style bw`)
+- [`examples/fig_weekday_daytime_color.pdf`](../examples/fig_weekday_daytime_color.pdf)
+  — Farbvariante (`--style color`)
+
+Beide zeigen Tagesprofil (Abb. 1), Stunden-Histogramm (Abb. 1b) und die
+Wochentagsauswertung (Abb. 2a/2b) auf zwei Seiten.
+
 ---
 
 ## Tageszeitblöcke

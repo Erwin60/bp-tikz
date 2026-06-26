@@ -32,6 +32,19 @@ per-block measurement coverage). The data-availability hints are data-driven:
 they name the weakest block automatically and switch to an "evenly covered"
 wording once coverage is balanced.
 
+### Example output
+
+Example documents generated from the anonymized sample CSV
+(`examples/bp_anon_example.csv`) are provided in the `examples/` folder:
+
+- [`examples/fig_weekday_daytime_bw.pdf`](../examples/fig_weekday_daytime_bw.pdf)
+  — black-and-white variant (`--style bw`)
+- [`examples/fig_weekday_daytime_color.pdf`](../examples/fig_weekday_daytime_color.pdf)
+  — color variant (`--style color`)
+
+Both show the daily profile (Fig. 1), the hour-of-day histogram (Fig. 1b), and
+the weekday analysis (Fig. 2a/2b) across two pages.
+
 ---
 
 ## Time-of-day blocks
