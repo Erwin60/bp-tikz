@@ -1,101 +1,50 @@
 # Changelog
 
-All notable changes to this project are documented here. The format is based on
-[Keep a Changelog](https://keepachangelog.com/), and this project adheres to
-[Semantic Versioning](https://semver.org/).
+Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
+Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
-## [1.2.3] - 2026-06-26
+## [1.2.3] – 2026-06
 
-### Changed
-- Regenerated the main-tool example figures (`examples/fig1.pdf` … `fig4b.pdf`)
-  from the current scripts so they include the v1.2.1 x-axis date-label fix.
-  `fig3.pdf` is the one-page standalone, `fig4a/b.pdf` the two-sides layout.
-- Rebuilt the documentation PDFs (`docs/bp_tikz_doc_DE.pdf`, `…_EN.pdf`) with the
-  refreshed figures.
+### Hinzugefügt
+- `--name NAME` in **beiden** Skripten: stellt allen Ausgabedateien einen
+  Präfix voran, um mehrere Personen zu unterscheiden
+  (`--name Gerti` → `Gerti_bp_diagrams.tex`,
+  `Gerti_bp_diagrams_both_onepage_standalone.tex`,
+  `Gerti_bp_weekday_daytime.tex`, …). Ein explizit gesetzter Pfad
+  (`--out`, `--standalone-out`, `--two-sides-out`) hat Vorrang vor dem
+  präfigierten Standardnamen.
+- `--help`-Beispiele in beiden Skripten (u. a. Zwei-Personen-Aufruf).
 
-### Added
-- Daytime manuals (`docs/Manual_Daytime_DE.md`, `…_EN.md`): an "example output"
-  section linking the `fig_weekday_daytime_*` example PDFs, mirroring how the
-  main-tool documentation references its examples.
+### Geändert
+- README beschreibt beide Skripte gemeinsam inklusive `--name`.
+- Optionstabellen aktualisiert: `docs/optionen_bp_tikz.csv` (mit `--name`),
+  `docs/optionen_daytime.csv` (mit `--name`).
 
-## [1.2.2] - 2026-06-25
+## [1.2.x] – früher
 
-### Fixed
-- `generate_bp_daytime_tikz.py`: bars in the hour-of-day histogram (Figure 1b)
-  were shifted off their tick positions by roughly half a unit. With three
-  `\addplot` bar series, PGFPlots applies an automatic group `bar shift`, so each
-  bar no longer sat centred above its hour. Added `bar shift=0pt` (the three
-  blocks cover disjoint hours and need no grouping offset), so every bar is now
-  centred exactly over its hour tick.
+### Hinzugefügt
+- Wochen-Mittellinie wählbar über `--week-central mean|median`
+  (Standard `mean`, anschlussfähig an HBPM/ESC-Mittelwertschwellen;
+  `median` konsistent zur IQR-Box und robuster gegen Ausreißertage).
+- Ausreißertage im Wochendiagramm über `--week-outliers` (mit
+  konfigurierbaren Schwellen `--week-outlier-sys-hi/-dia-hi` und optionalen
+  unteren Schwellen).
+- One-Page-Standalone als echte A4-Seite, deren Diagramme die verfügbare
+  Höhe automatisch ausfüllen.
+- Tageszeit-×-Wochentag-Diagramm (`generate_bp_daytime_tikz.py`) mit
+  `--style color|bw`, konfigurierbaren Blöcken `--blocks "a,b"`,
+  `--outliers up|both|none` und Datumsfilter `--date-from` / `--date-to`.
 
-## [1.2.1] - 2026-06-25
+## [1.1.0] – früher
 
-### Fixed
-- `generate_bp_tikz.py`: x-axis date labels on the daily chart could overlap at
-  the right edge when the most recent day fell just after a regular tick (e.g.
-  ticks 40 and 41 printed "24.0625.06"). The final tick is now replaced by the
-  most recent day instead of appended when the gap is smaller than half a tick
-  step, so the latest date is still labelled but never collides. Applies to both
-  the one-page and two-sides standalone layouts.
+### Hinzugefügt
+- Datumsfilter `--date-from` / `--date-to` (beide inklusive); der Kopf des
+  Diagramms zeigt den tatsächlich ausgewerteten Zeitraum.
+- Drei konfigurierbare Tageszeit-Blöcke via `--blocks "a,b"`.
 
-## [1.2.0] - 2026-06-24
+## [1.0.0] – Erstveröffentlichung
 
-### Added
-- `generate_bp_daytime_tikz.py`: an **hour-of-day measurement histogram**
-  (Figure 1b) directly below the daily profile. Bars count readings per hour
-  (0–23), are coloured by time-of-day block (Morning/Midday/Evening) in the same
-  color/BW style as the other figures, and dashed vertical lines mark the block
-  boundaries. This visualizes measurement coverage across the day, i.e. how well
-  the daily kinetics are sampled.
-
-### Changed
-- `generate_bp_daytime_tikz.py`: the data-availability note and interpretation
-  text are now **fully data-driven** with respect to block coverage. Instead of
-  always referring to the evening block as sparse, the text now names the
-  actually weakest block (using a < 60 % of-average threshold) and automatically
-  switches to a "blocks are now evenly covered" wording once coverage is
-  balanced.
-- Regenerated example outputs
-  (`examples/fig_weekday_daytime_color.pdf`, `…_bw.pdf`) to include Figure 1b.
-
-## [1.1.0] - 2026-06-23
-
-### Added
-- Companion tool `generate_bp_daytime_tikz.py` for **time-of-day × weekday**
-  analysis: a self-contained LaTeX/PGFPlots document with a daily profile
-  (median per Morning/Midday/Evening block with IQR bands) and grouped
-  weekday × time-of-day median bars.
-- Three configurable time-of-day blocks via `--blocks "a,b"` (labels adapt
-  automatically).
-- Tukey outlier marking (`--outliers up|both|none`) with an `IQR ≥ 1 mmHg`
-  guard against pseudo-outliers; high outliers as circles, low as `×`.
-- Color and black-and-white styles (`--style color|bw`); in BW the ESC corridor
-  is hatched to stay distinct from the solid IQR bands.
-- Time-of-day recovery from a time column, the **Note** column (iBP export), or
-  a timestamp in the date field; two-digit years and AM/PM supported.
-- Automatic evaluation-period (from–to) and count header, plus a fully
-  data-driven interpretation note.
-- German and English manuals (`docs/Manual_Daytime_DE.md`,
-  `docs/Manual_Daytime_EN.md`) and example outputs
-  (`examples/fig_weekday_daytime_color.pdf`, `…_bw.pdf`).
-
-## [1.0.0] - 2026-06-23
-
-### Added
-- Two-stage aggregation (per calendar day, then fixed-length blocks).
-- Daily diagram with daily-median points, min–max ranges, optional `n=` labels,
-  and an automatic summary line.
-- Block diagram with selectable central line (`--week-central mean|median`) and
-  IQR error bars of daily medians.
-- Outlier-day marking (`--week-outliers`) with configurable upper/lower
-  thresholds.
-- Optional daily and weekly statistics CSV export.
-- One-page and two-sides standalone LaTeX outputs; the one-page layout scales
-  the diagram heights to fill the available page height.
-- European/English number and date parsing; comma/semicolon/tab delimiter
-  auto-detection.
-- IEEE-format documentation (DE/EN) and Markdown manuals (DE/EN).
-
-### Fixed
-- One-page standalone now fills the full page height regardless of caption and
-  legend length.
+### Hinzugefügt
+- `generate_bp_tikz.py`: Tagesdiagramm (Median + Spannweite) und
+  verdichtetes 7-Tage-Diagramm (IQR der Tagesmediane + Verlaufslinie),
+  LaTeX/PGFPlots, Fragment + Standalone-Ausgaben, optionale Statistik-CSVs.

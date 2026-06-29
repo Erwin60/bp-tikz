@@ -1,0 +1,9 @@
+Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
+--csv CSV,nein,bp.csv,"Eingabedatei mit den Blutdruckmessungen. Trennzeichen und Dezimalkomma werden automatisch erkannt; benötigt Datum, Uhrzeit sowie systolisch/diastolisch.",--csv iBP_Readings.csv
+--style color|bw,nein,color,"Layout des Diagramms: color (Farbe) oder bw (Schwarz-Weiß, Graustufen + Muster).",--style bw
+"--blocks A,B",nein,"10,15","Blockgrenzen in Stunden (Morgen < A, Mittag A..B, Abend > B).","--blocks 10,15"
+--outliers up|both|none,nein,up,"Ausreißer-Darstellung: up nur nach oben (Kreise), both zusätzlich nach unten (Kreuz), none keine.",--outliers both
+--date-from DATE_FROM,nein,"None, alle ab Beginn",Startdatum der Auswertung (inklusive). Messungen davor werden ignoriert.,--date-from 15.05.2026
+--date-to DATE_TO,nein,"None, alle bis Ende",Enddatum der Auswertung (inklusive). Ohne Angabe alle Messungen ab --date-from.,--date-to 20.06.2026
+--name NAME,nein,"None, kein Präfix","Präfix für den Ausgabedateinamen, um z. B. zwei Personen zu unterscheiden (--name Gerti -> Gerti_bp_weekday_daytime.tex). Ein explizit gesetztes --out hat Vorrang.",--name Gerti
+"-o, --out OUT",nein,[name_]bp_weekday_daytime.tex,Ausgabedatei (.tex). Ohne Angabe wird der Standardname (ggf. mit --name-Präfix) verwendet.,--out Gerti_daytime.tex

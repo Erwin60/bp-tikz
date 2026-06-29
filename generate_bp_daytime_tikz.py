@@ -830,7 +830,16 @@ def build_document(rows, style, morning_end, midday_end, direction="up"):
 def main():
     ap = argparse.ArgumentParser(
         description="Erzeugt das LaTeX/TikZ-Diagramm 'Tageszeit x Wochentag' "
-                    "aus einem Blutdruck-CSV; umschaltbar zwischen Farbe und Schwarz-Weiss.")
+                    "aus einem Blutdruck-CSV; umschaltbar zwischen Farbe und Schwarz-Weiss. "
+                    "Mit --name wird der Ausgabedatei ein Praefix vorangestellt, um z. B. "
+                    "zwei Personen zu unterscheiden (--name Gerti -> Gerti_bp_weekday_daytime.tex).",
+        epilog="Beispiele:\n"
+               "  Minimal:        python3 generate_bp_daytime_tikz.py --csv iBP.csv\n"
+               "  Zwei Personen:  python3 generate_bp_daytime_tikz.py --csv Gerti.csv --name Gerti\n"
+               "                  python3 generate_bp_daytime_tikz.py --csv Erwin.csv --name Erwin\n"
+               "  Schwarz-Weiss:  python3 generate_bp_daytime_tikz.py --csv iBP.csv --style bw\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     ap.add_argument("--csv", default="bp.csv",
                     help="Pfad zur CSV-Datei. Spaltentrenner (Komma/Semikolon/Tab) und "
                          "Dezimalkomma werden automatisch erkannt; benoetigt Datum, Uhrzeit "
@@ -853,9 +862,23 @@ def main():
                     help="Enddatum der Auswertung (inklusive). Messungen danach "
                          "werden ignoriert. Ohne Angabe werden alle Messungen "
                          "ab --date-from verwendet.")
-    ap.add_argument("-o", "--out", default="bp_weekday_daytime.tex",
-                    help="Ausgabedatei (.tex). Standard: bp_weekday_daytime.tex")
+    ap.add_argument("--name", default=None,
+                    help="Optionaler Personen-/Lauf-Name als Praefix fuer den Ausgabedateinamen, "
+                         "um z. B. zwei Personen zu unterscheiden (--name Gerti -> "
+                         "Gerti_bp_weekday_daytime.tex). Ein explizit gesetztes --out hat Vorrang "
+                         "vor dem praefigierten Standardnamen. Standard: kein Praefix.")
+    ap.add_argument("-o", "--out", default=None,
+                    help="Ausgabedatei (.tex). Standard: [name_]bp_weekday_daytime.tex")
     args = ap.parse_args()
+
+    # Ausgabedateiname aufloesen: --name als Praefix, sofern --out nicht
+    # explizit gesetzt wurde. Ein explizites --out hat immer Vorrang.
+    if args.out is None:
+        prefix = (args.name.strip() if args.name else "")
+        if prefix:
+            prefix = _re.sub(r"[^A-Za-z0-9._-]+", "_", prefix).strip("_")
+        args.out = (f"{prefix}_bp_weekday_daytime.tex" if prefix
+                    else "bp_weekday_daytime.tex")
 
     try:
         a, b = (int(x) for x in args.blocks.split(","))

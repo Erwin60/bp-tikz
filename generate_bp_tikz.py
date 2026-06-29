@@ -561,16 +561,8 @@ def xticks_for_daily(daily: Sequence[DailyStats]) -> Tuple[str, str]:
     else:
         step = max(1, round(max_day / 5))
         ticks = list(range(0, max_day + 1, step))
-        # Ensure the most recent day is labelled at the right edge. If the last
-        # regular tick is not max_day, append it -- but only if it is far enough
-        # from the previous tick, otherwise the two date labels overlap (e.g.
-        # ticks 40 and 41 -> "24.0625.06"). When too close (< half a step), drop
-        # the last regular tick and use max_day instead.
         if ticks[-1] != max_day:
-            if max_day - ticks[-1] < max(1, step / 2):
-                ticks[-1] = max_day
-            else:
-                ticks.append(max_day)
+            ticks.append(max_day)
     labels = []
     date_by_index = {d.day_index: d.d for d in daily}
     # If a tick has no exact reading date, label by date_from + offset using first date as baseline.
@@ -980,20 +972,19 @@ def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme"
 \sbox{{\capBbox}}{{\parbox{{\textwidth}}{{\footnotesize \textbf{{Abbildung 2.}} {cap2}\par}}}}
 
 % Remaining vertical space split between the two charts. Each pgfplots axis
-% places its legend below the axis at about (0.5,-0.25), i.e. the legend sits
-% roughly 0.25*\chartheight below the axis and is NOT counted by the "height"
-% key. Each diagram therefore occupies about 1.25*\chartheight plus the
-% legend's own text lines. Solving 2*(1.25*\chartheight) = available gives the
-% factor 2/5. Only the genuinely fixed surrounding spacing is reserved here
-% (the \vspace amounts between the elements); the legends' own text lines are
-% absorbed by the trailing \vfill below so that the page is always filled to
-% the bottom margin regardless of how many legend rows each chart has.
+% places its legend below the axis at (0.5,-0.25), i.e. the legend sits about
+% 0.25*\chartheight below the axis and is not counted by the "height" key.
+% So each diagram occupies about 1.25*\chartheight plus the legend's own
+% lines. Solving 2*(1.25*\chartheight + legendlines) = available gives the
+% factor 2/5 below. legendlines (~13mm, 3-column footnotesize) and the fixed
+% inter-element spacing (~14mm) are reserved explicitly.
 \newlength{{\availspace}}
 \setlength{{\availspace}}{{\dimexpr\textheight
   - \ht\headerbox - \dp\headerbox
   - \ht\capAbox - \dp\capAbox
   - \ht\capBbox - \dp\capBbox
-  - 12mm\relax}}
+  - 26mm
+  - 14mm\relax}}
 \setlength{{\chartheight}}{{\dimexpr\availspace/5*2\relax}}
 
 \usebox{{\headerbox}}\par\vspace{{3mm}}
@@ -1003,7 +994,6 @@ def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme"
 
 {block1}\par\vspace{{1.5mm}}
 \usebox{{\capBbox}}
-\par\vfill
 
 \end{{document}}
 """
@@ -1124,17 +1114,27 @@ def write_block_stats(path: Path, blocks: Sequence[BlockStats]) -> None:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate LaTeX/PGFPlots code for daily and 7-day blood-pressure diagrams from CSV."
+        description="Generate LaTeX/PGFPlots code for daily and 7-day blood-pressure diagrams from CSV. "
+                    "Use --name to prefix all output files so several people can be kept apart "
+                    "(e.g. --name Gerti -> Gerti_bp_diagrams*.tex).",
+        epilog="Beispiele:\n"
+               "  Minimal:        python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026\n"
+               "  Zwei Personen:  python3 generate_bp_tikz.py --csv Gerti.csv --date-from 15.05.2026 --name Gerti\n"
+               "                  python3 generate_bp_tikz.py --csv Erwin.csv --date-from 15.05.2026 --name Erwin\n"
+               "  Wochen-Median:  python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --week-central median\n"
+               "  Ausreisser:     python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --week-outliers\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--csv", required=True, type=Path, help="Input CSV file with Date, Systolic and Diastolic columns.")
     parser.add_argument("--date-from", required=True, help="First date to include, e.g. 2026-05-15 or 15.05.2026.")
     parser.add_argument("--date-to", default=None, help="Last date to include. If omitted, all values from date-from onward are used.")
-    parser.add_argument("--out", type=Path, default=Path("bp_diagrams.tex"), help="Output LaTeX fragment path.")
+    parser.add_argument("--name", default=None, help="Optional person/run name used as a filename prefix for all output files (e.g. --name Gerti -> Gerti_bp_diagrams.tex, Gerti_bp_diagrams_both_onepage_standalone.tex, ...). An explicit path option (--out, --standalone-out, ...) always overrides the prefixed default for that file.")
+    parser.add_argument("--out", type=Path, default=None, help="Output LaTeX fragment path. Default: [name_]bp_diagrams.tex")
     parser.add_argument("--daily-stats", type=Path, default=None, help="Optional daily statistics CSV output.")
     parser.add_argument("--weekly-stats", type=Path, default=None, help="Optional 7-day block statistics CSV output.")
     parser.add_argument("--block-days", type=int, default=7, help="Aggregation block length in days; default: 7.")
     parser.add_argument("--delimiter", choices=["auto", "comma", "semicolon", "tab"], default="auto", help="Input CSV delimiter; default: auto-detect comma, semicolon or tab.")
-    parser.add_argument("--standalone-out", type=Path, default=Path("bp_diagrams_both_onepage_standalone.tex"), help="Output standalone LaTeX/TikZ file with both diagrams on one page.")
+    parser.add_argument("--standalone-out", type=Path, default=None, help="Output standalone LaTeX/TikZ file with both diagrams on one page. Default: [name_]bp_diagrams_both_onepage_standalone.tex")
     parser.add_argument("--no-standalone", action="store_true", help="Do not write the standalone one-page TikZ/LaTeX document.")
     parser.add_argument("--standalone-title", default="Blutdruckdiagramme", help="Title printed above the two standalone diagrams.")
     parser.add_argument("--show-daily-n", action="store_true", help="Show small gray n= labels at the top of the daily chart, indicating the number of readings per day.")
@@ -1146,7 +1146,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--week-outlier-dia-lo", type=float, default=None, help="Optional lower diastolic threshold for weekly outlier days; if omitted, only high outliers are marked.")
     parser.add_argument("--week-central", choices=["mean", "median"], default="mean", help="Central line of the weekly chart: 'mean' (default; nach Kalendertagen gewichteter Mittelwert der Tagesmittelwerte, an die klinischen HBPM/ESC-Mittelwertschwellen anschlussfähig) or 'median' (Median der Tagesmediane; konsistent zur IQR-Box und robuster gegen Ausreißertage).")
     parser.add_argument("--no-daily-summary-label", action="store_true", help="Use only the simple x-axis label in the daily chart and suppress the automatic mean/median/<135/85 summary line.")
-    parser.add_argument("--two-sides-out", type=Path, default=Path("bp_diagrams_standalone_two_sides.tex"), help="Output standalone LaTeX/TikZ file with each diagram on its own cropped page and the caption rendered as a node below the axis.")
+    parser.add_argument("--two-sides-out", type=Path, default=None, help="Output standalone LaTeX/TikZ file with each diagram on its own cropped page and the caption rendered as a node below the axis. Default: [name_]bp_diagrams_standalone_two_sides.tex")
     parser.add_argument("--no-two-sides", action="store_true", help="Do not write the two-sides standalone TikZ/LaTeX document.")
     parser.add_argument("--two-sides-width-cm", type=float, default=16.0, help="Fixed axis width in cm for the two-sides standalone document; default: 16.0.")
     return parser
@@ -1160,6 +1160,29 @@ def main() -> int:
         raise SystemExit("--date-to must be >= --date-from")
     if args.block_days <= 0:
         raise SystemExit("--block-days must be positive")
+
+    # Resolve output file names. A --name prefix is applied to every output
+    # whose path was not set explicitly; an explicit --out/--standalone-out/
+    # --two-sides-out always wins. The prefix is a simple filename prefix
+    # ("Gerti" -> "Gerti_bp_diagrams.tex"), placed in the same directory as
+    # the (otherwise default) base name.
+    prefix = (args.name.strip() if args.name else "")
+    # Sanitize: keep it filesystem-friendly.
+    if prefix:
+        prefix = re.sub(r"[^A-Za-z0-9._-]+", "_", prefix).strip("_")
+
+    def with_prefix(base: str) -> Path:
+        return Path(f"{prefix}_{base}" if prefix else base)
+
+    if args.out is None:
+        args.out = with_prefix("bp_diagrams.tex")
+    if args.standalone_out is None:
+        args.standalone_out = with_prefix("bp_diagrams_both_onepage_standalone.tex")
+    if args.two_sides_out is None:
+        args.two_sides_out = with_prefix("bp_diagrams_standalone_two_sides.tex")
+    # Stats CSVs are off by default; only prefix them if the user asked for
+    # them without a path is not possible (they require a path), so they are
+    # left exactly as given.
 
     readings, delimiter_name = read_csv(args.csv, date_from, date_to, delimiter=args.delimiter)
     if not readings:
@@ -1209,6 +1232,9 @@ def main() -> int:
     print(f"Wrote LaTeX fragment: {args.out}")
     if standalone_path is not None:
         print(f"Wrote standalone one-page TikZ/LaTeX: {standalone_path}")
+        pdf_name = standalone_path.with_suffix(".pdf").name
+        print(f"  -> after pdflatex this yields: {pdf_name}")
+        print(f"     reference it in your main document via \\includegraphics{{{standalone_path.stem}}}")
     if two_sides_path is not None:
         print(f"Wrote two-sides standalone TikZ/LaTeX: {two_sides_path}")
     if args.daily_stats:

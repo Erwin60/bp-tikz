@@ -1,0 +1,25 @@
+Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
+--csv CSV,ja,"kein Standard, muss angegeben werden","Eingabedatei mit den Blutdruckmessungen. Die CSV muss mindestens Datum, systolischen und diastolischen Blutdruck enthalten.",--csv iBP_Readings.csv
+--date-from DATE_FROM,ja,"kein Standard, muss angegeben werden",Startdatum der Auswertung. Alle Messungen vor diesem Datum werden ignoriert.,--date-from 15.05.2026
+--name NAME,nein,"None, kein Präfix","Präfix für alle Ausgabedateinamen, um z. B. zwei Personen zu unterscheiden (--name Gerti -> Gerti_bp_diagrams.tex usw.). Ein explizit gesetzter Pfad (--out, --standalone-out, --two-sides-out) hat Vorrang vor dem präfigierten Standardnamen.",--name Gerti
+--date-to DATE_TO,nein,"None, also alle Werte ab --date-from","Enddatum der Auswertung. Wird es weggelassen, werden alle Messungen ab --date-from verwendet.",--date-to 20.06.2026
+--out OUT,nein,bp_diagrams.tex,Name der LaTeX-Fragmentdatei für die Einbindung in ein bestehendes Hauptdokument.,--out bp_diagrams_fragment.tex
+--daily-stats DAILY_STATS,nein,"None, wird nicht erzeugt",Export der berechneten Tagesstatistik als CSV. Sinnvoll zur Kontrolle und für Excel.,--daily-stats bp_diagrams_daily_stats.csv
+--weekly-stats WEEKLY_STATS,nein,"None, wird nicht erzeugt",Export der 7-Tage-Blockstatistik als CSV. Sinnvoll zur Kontrolle und für Excel.,--weekly-stats bp_diagrams_7day_stats.csv
+--block-days BLOCK_DAYS,nein,7,"Länge der Aggregationsblöcke für das zweite Diagramm. Standard ist 7, also 7-Tage-Blöcke.",--block-days 7
+--delimiter auto|comma|semicolon|tab,nein,auto,"Steuert das CSV-Trennzeichen. Bei auto versucht das Skript Komma, Semikolon oder Tab selbst zu erkennen.",--delimiter semicolon
+--standalone-out STANDALONE_OUT,nein,bp_diagrams_both_onepage_standalone.tex,Erzeugt eine Standalone-LaTeX-Datei (A4) mit beiden Diagrammen auf einer Seite. Diese PDF eignet sich gut zum Einbinden ins Hauptdokument.,--standalone-out bp_diagrams_both_onepage_standalone.tex
+--no-standalone,nein,"False, One-Page-Standalone wird erzeugt","Unterdrückt die Erzeugung der One-Page-Standalone-Datei. Sinnvoll, wenn nur das Fragment oder Statistikdateien benötigt werden.",--no-standalone
+--standalone-title STANDALONE_TITLE,nein,Blutdruckdiagramme,Überschrift über den beiden Diagrammen im One-Page-Standalone-Dokument.,"--standalone-title ""Aktuelle Blutdruckdiagramme"""
+--show-daily-n,nein,"False, keine n=-Labels",Zeigt am oberen Rand des Tagesdiagramms graue n=-Angaben mit der Anzahl der Messungen pro Tag.,--show-daily-n
+--daily-n-y DAILY_N_Y,nein,"None, automatische Platzierung",Feste y-Position der n=-Labels. Ohne Angabe werden sie automatisch knapp unter den (dynamischen) oberen Diagrammrand gesetzt.,--daily-n-y 150
+--week-outliers,nein,"False, keine Ausreißer-Punkte",Markiert im Wochendiagramm einzelne Ausreißer-Tage (Tagesmedian über klinischer Schwelle) als kleine Kreise neben dem IQR-Marker des Blocks.,--week-outliers
+--week-outlier-sys-hi SYS_HI,nein,135.0,Obere systolische Schwelle für Wochen-Ausreißer-Tage (HBPM-Vergleichslinie).,--week-outlier-sys-hi 135
+--week-outlier-dia-hi DIA_HI,nein,85.0,Obere diastolische Schwelle für Wochen-Ausreißer-Tage (HBPM-Vergleichslinie).,--week-outlier-dia-hi 85
+--week-outlier-sys-lo SYS_LO,nein,"None, nur hohe Ausreißer",Optionale untere systolische Schwelle für Wochen-Ausreißer-Tage. Ohne Angabe werden nur hohe Ausreißer markiert.,--week-outlier-sys-lo 100
+--week-outlier-dia-lo DIA_LO,nein,"None, nur hohe Ausreißer",Optionale untere diastolische Schwelle für Wochen-Ausreißer-Tage. Ohne Angabe werden nur hohe Ausreißer markiert.,--week-outlier-dia-lo 60
+--week-central mean|median,nein,mean,"Mittellinie des Wochendiagramms: mean (nach Kalendertagen gewichteter Mittelwert der Tagesmittelwerte, anschlussfähig an die mittelwertbasierten HBPM/ESC-Schwellen) oder median (Median der Tagesmediane, konsistent zur IQR-Box und robuster gegen Ausreißertage).",--week-central median
+--no-daily-summary-label,nein,"False, Zusammenfassungszeile wird gezeigt",Unterdrückt die Zusammenfassungszeile (Mittelwert/Median/Anteil unter Schwelle) unter dem Tagesdiagramm.,--no-daily-summary-label
+--two-sides-out TWO_SIDES_OUT,nein,bp_diagrams_standalone_two_sides.tex,"Erzeugt ein Standalone-Dokument, bei dem jedes Diagramm auf einer eigenen, eng zugeschnittenen Seite steht (Bildunterschrift als Knoten unter der Achse).",--two-sides-out bp_diagrams_standalone_two_sides.tex
+--no-two-sides,nein,"False, Two-Sides-Datei wird erzeugt",Unterdrückt die Erzeugung des Two-Sides-Standalone-Dokuments.,--no-two-sides
+--two-sides-width-cm WIDTH,nein,16.0,Feste Achsenbreite in cm für das Two-Sides-Standalone-Dokument.,--two-sides-width-cm 17.0
