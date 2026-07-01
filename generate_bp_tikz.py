@@ -1116,11 +1116,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Generate LaTeX/PGFPlots code for daily and 7-day blood-pressure diagrams from CSV. "
                     "Use --name to prefix all output files so several people can be kept apart "
-                    "(e.g. --name Gerti -> Gerti_bp_diagrams*.tex).",
+                    "(e.g. --name Eva -> Eva_bp_diagrams*.tex).",
         epilog="Beispiele:\n"
                "  Minimal:        python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026\n"
-               "  Zwei Personen:  python3 generate_bp_tikz.py --csv Gerti.csv --date-from 15.05.2026 --name Gerti\n"
-               "                  python3 generate_bp_tikz.py --csv Erwin.csv --date-from 15.05.2026 --name Erwin\n"
+               "  Zwei Personen:  python3 generate_bp_tikz.py --csv Eva.csv --date-from 15.05.2026 --name Eva\n"
+               "                  python3 generate_bp_tikz.py --csv Adam.csv --date-from 15.05.2026 --name Adam\n"
                "  Wochen-Median:  python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --week-central median\n"
                "  Ausreisser:     python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --week-outliers\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1128,7 +1128,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--csv", required=True, type=Path, help="Input CSV file with Date, Systolic and Diastolic columns.")
     parser.add_argument("--date-from", required=True, help="First date to include, e.g. 2026-05-15 or 15.05.2026.")
     parser.add_argument("--date-to", default=None, help="Last date to include. If omitted, all values from date-from onward are used.")
-    parser.add_argument("--name", default=None, help="Optional person/run name used as a filename prefix for all output files (e.g. --name Gerti -> Gerti_bp_diagrams.tex, Gerti_bp_diagrams_both_onepage_standalone.tex, ...). An explicit path option (--out, --standalone-out, ...) always overrides the prefixed default for that file.")
+    parser.add_argument("--name", default=None, help="Optional person/run name used as a filename prefix for all output files (e.g. --name Eva -> Eva_bp_diagrams.tex, Eva_bp_diagrams_both_onepage_standalone.tex, ...). An explicit path option (--out, --standalone-out, ...) always overrides the prefixed default for that file.")
     parser.add_argument("--out", type=Path, default=None, help="Output LaTeX fragment path. Default: [name_]bp_diagrams.tex")
     parser.add_argument("--daily-stats", type=Path, default=None, help="Optional daily statistics CSV output.")
     parser.add_argument("--weekly-stats", type=Path, default=None, help="Optional 7-day block statistics CSV output.")
@@ -1164,7 +1164,7 @@ def main() -> int:
     # Resolve output file names. A --name prefix is applied to every output
     # whose path was not set explicitly; an explicit --out/--standalone-out/
     # --two-sides-out always wins. The prefix is a simple filename prefix
-    # ("Gerti" -> "Gerti_bp_diagrams.tex"), placed in the same directory as
+    # ("Eva" -> "Eva_bp_diagrams.tex"), placed in the same directory as
     # the (otherwise default) base name.
     prefix = (args.name.strip() if args.name else "")
     # Sanitize: keep it filesystem-friendly.

@@ -3,14 +3,26 @@
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
+## [1.2.4] – 2026-07
+
+### Behoben
+- `generate_bp_daytime_tikz.py`: In den unteren Diagrammen überdeckte die
+  Legende den x-Achsentitel (Abb. 1b „Uhrzeit [h]", Abb. 2b „Wochentag").
+  Der vertikale Legendenversatz hängt jetzt davon ab, ob ein Achsentitel
+  vorhanden ist, sodass Titel und Legende getrennt stehen.
+
+### Geändert
+- Beispiel-Namen in Doku und Skript-Hilfen von Adam/Eva verwendet
+  (zuvor andere Vornamen).
+
 ## [1.2.3] – 2026-06
 
 ### Hinzugefügt
 - `--name NAME` in **beiden** Skripten: stellt allen Ausgabedateien einen
   Präfix voran, um mehrere Personen zu unterscheiden
-  (`--name Gerti` → `Gerti_bp_diagrams.tex`,
-  `Gerti_bp_diagrams_both_onepage_standalone.tex`,
-  `Gerti_bp_weekday_daytime.tex`, …). Ein explizit gesetzter Pfad
+  (`--name Eva` → `Eva_bp_diagrams.tex`,
+  `Eva_bp_diagrams_both_onepage_standalone.tex`,
+  `Eva_bp_weekday_daytime.tex`, …). Ein explizit gesetzter Pfad
   (`--out`, `--standalone-out`, `--two-sides-out`) hat Vorrang vor dem
   präfigierten Standardnamen.
 - `--help`-Beispiele in beiden Skripten (u. a. Zwei-Personen-Aufruf).

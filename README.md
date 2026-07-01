@@ -34,21 +34,21 @@ TEXINPUTS=.: pdflatex bp_weekday_daytime.tex
 Beide Skripte stellen mit `--name` allen Ausgabedateien einen Präfix voran:
 
 ```bash
-python3 generate_bp_tikz.py        --csv Gerti.csv --date-from 15.05.2026 --name Gerti
-python3 generate_bp_daytime_tikz.py --csv Gerti.csv --name Gerti
+python3 generate_bp_tikz.py        --csv Eva.csv --date-from 15.05.2026 --name Eva
+python3 generate_bp_daytime_tikz.py --csv Eva.csv --name Eva
 
-python3 generate_bp_tikz.py        --csv Erwin.csv --date-from 15.05.2026 --name Erwin
-python3 generate_bp_daytime_tikz.py --csv Erwin.csv --name Erwin
+python3 generate_bp_tikz.py        --csv Adam.csv --date-from 15.05.2026 --name Adam
+python3 generate_bp_daytime_tikz.py --csv Adam.csv --name Adam
 ```
 
-Ergebnis u. a. `Gerti_bp_diagrams.tex`, `Gerti_bp_diagrams_both_onepage_standalone.tex`, `Gerti_bp_weekday_daytime.tex` und analog `Erwin_…`.
+Ergebnis u. a. `Eva_bp_diagrams.tex`, `Eva_bp_diagrams_both_onepage_standalone.tex`, `Eva_bp_weekday_daytime.tex` und analog `Adam_…`.
 
 Ein explizit gesetzter Pfad (`--out`, bei `generate_bp_tikz.py` auch `--standalone-out` / `--two-sides-out`) hat Vorrang vor dem präfigierten Standardnamen.
 
 Im Hauptdokument die jeweils passende PDF referenzieren, z. B.:
 
 ```latex
-\includegraphics{Gerti_bp_diagrams_both_onepage_standalone}
+\includegraphics{Eva_bp_diagrams_both_onepage_standalone}
 ```
 
 `generate_bp_tikz.py` gibt den erwarteten PDF-Namen am Ende seines Laufs aus.

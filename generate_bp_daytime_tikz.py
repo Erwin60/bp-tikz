@@ -564,7 +564,7 @@ def build_hour_histogram(rows, st, morning_end, midday_end):
     ylabel={{\footnotesize Messungen}},
     ymajorgrids=true, grid style={{gray!25}},
     title={{\footnotesize\bfseries Abb.~1b: Anzahl Messungen je Stunde}},
-    legend style={{at={{(0.5,-0.30)}},anchor=north,legend columns=3,font=\scriptsize,draw=gray!50}},
+    legend style={{at={{(0.5,-0.42)}},anchor=north,legend columns=3,font=\scriptsize,draw=gray!50}},
     legend image post style={{scale=1.2}},
 ]
 {sep}
@@ -639,6 +639,10 @@ def build_weekday_plot(wd, outl, st, metric, ymin, ymax, ylabel, title,
         corr = (rf"\fill[{st['corridor_fill']}] "
                 rf"([xshift=-7mm]axis cs:Mo,{clo}) rectangle ([xshift=7mm]axis cs:So,{chi});")
     xlab = rf"xlabel={{{xlabel}}}," if xlabel else ""
+    # When an x-axis label is present it occupies the space directly below the
+    # axis, so the legend (also placed below the axis) must sit lower to avoid
+    # overprinting the label (e.g. "Wochentag" in Abb. 2b).
+    legend_y = "-0.34" if xlabel else "-0.24"
     return rf"""\begin{{tikzpicture}}
 \begin{{axis}}[
     width=0.92\textwidth, height=5.9cm,
@@ -648,7 +652,7 @@ def build_weekday_plot(wd, outl, st, metric, ymin, ymax, ylabel, title,
     symbolic x coords={{Mo,Di,Mi,Do,Fr,Sa,So}}, xtick=data,
     ymajorgrids=true, grid style={{gray!25}},
     axis on top=false,
-    legend style={{at={{(0.5,-0.24)}},anchor=north,legend columns=3,font=\scriptsize,draw=gray!50}},
+    legend style={{at={{(0.5,{legend_y})}},anchor=north,legend columns=3,font=\scriptsize,draw=gray!50}},
     legend image post style={{scale=1.6}},
     title={{\footnotesize\bfseries {title}}},
 ]
@@ -832,11 +836,11 @@ def main():
         description="Erzeugt das LaTeX/TikZ-Diagramm 'Tageszeit x Wochentag' "
                     "aus einem Blutdruck-CSV; umschaltbar zwischen Farbe und Schwarz-Weiss. "
                     "Mit --name wird der Ausgabedatei ein Praefix vorangestellt, um z. B. "
-                    "zwei Personen zu unterscheiden (--name Gerti -> Gerti_bp_weekday_daytime.tex).",
+                    "zwei Personen zu unterscheiden (--name Eva -> Eva_bp_weekday_daytime.tex).",
         epilog="Beispiele:\n"
                "  Minimal:        python3 generate_bp_daytime_tikz.py --csv iBP.csv\n"
-               "  Zwei Personen:  python3 generate_bp_daytime_tikz.py --csv Gerti.csv --name Gerti\n"
-               "                  python3 generate_bp_daytime_tikz.py --csv Erwin.csv --name Erwin\n"
+               "  Zwei Personen:  python3 generate_bp_daytime_tikz.py --csv Eva.csv --name Eva\n"
+               "                  python3 generate_bp_daytime_tikz.py --csv Adam.csv --name Adam\n"
                "  Schwarz-Weiss:  python3 generate_bp_daytime_tikz.py --csv iBP.csv --style bw\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -864,8 +868,8 @@ def main():
                          "ab --date-from verwendet.")
     ap.add_argument("--name", default=None,
                     help="Optionaler Personen-/Lauf-Name als Praefix fuer den Ausgabedateinamen, "
-                         "um z. B. zwei Personen zu unterscheiden (--name Gerti -> "
-                         "Gerti_bp_weekday_daytime.tex). Ein explizit gesetztes --out hat Vorrang "
+                         "um z. B. zwei Personen zu unterscheiden (--name Eva -> "
+                         "Eva_bp_weekday_daytime.tex). Ein explizit gesetztes --out hat Vorrang "
                          "vor dem praefigierten Standardnamen. Standard: kein Praefix.")
     ap.add_argument("-o", "--out", default=None,
                     help="Ausgabedatei (.tex). Standard: [name_]bp_weekday_daytime.tex")
