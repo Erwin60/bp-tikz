@@ -22,12 +22,24 @@ python3 generate_bp_tikz.py --csv iBP_Readings.csv --date-from 15.05.2026
 python3 generate_bp_daytime_tikz.py --csv iBP_Readings.csv
 ```
 
+`--date-from` ist bei beiden Skripten optional. Ohne die Angabe werden alle Messungen ab dem frühesten Datum ausgewertet; beide Skripte verhalten sich dabei identisch. Weicht das früheste Datum auffällig weit ab (mehr als 90 Tage vor der nächsten Messung, ein typischer Datums-Tippfehler wie ein falsches Jahr), geben beide eine Warnung aus.
+
 Kompilieren (deutsches Babel benötigt; aus dem Arbeitsverzeichnis):
 
 ```bash
 TEXINPUTS=.: pdflatex bp_diagrams_both_onepage_standalone.tex
 TEXINPUTS=.: pdflatex bp_weekday_daytime.tex
 ```
+
+## Eingabeformat und iBP-Normalisierung
+
+Beide Skripte akzeptieren zwei CSV-Varianten:
+
+Ein **normales, z. B. aus Excel exportiertes** CSV mit getrennten Spalten für Datum, Uhrzeit, systolischen und diastolischen Wert (Spaltennamen werden über Aliase in Deutsch und Englisch erkannt; zusätzliche Spalten wie Puls, Gewicht oder Notizen werden ignoriert).
+
+Das **Export-CSV der iBP-App**. Dieses hat eine Besonderheit: Es legt Datum und Uhrzeit als zwei komma-getrennte Felder in der Date-Spalte ab (z. B. `05.07.26, 20:23`), obwohl die Kopfzeile nur eine Date-Spalte vorsieht. Dadurch hat jede Datenzeile ein Feld mehr als die Kopfzeile, die Uhrzeit rutscht in die Note-Spalte und eine echte Notiz in ein überzähliges Feld. Ohne Behandlung führt das zu falsch zugeordneten oder verlorenen Messungen.
+
+Beide Skripte erkennen das iBP-Format automatisch an seiner Signatur (Spalten „Mean Arterial Pressure" und „Pulse Pressure" plus die überzählige Feldzahl) und **normalisieren es vor der eigentlichen Verarbeitung** („streamlining") in ein kanonisches Format `Datum;Zeit;Systolisch;Diastolisch;Puls;note`. Anschließend durchläuft es denselben Verarbeitungsweg wie ein Excel-CSV. Nicht-iBP-Dateien werden unverändert weitergereicht. Es ist also keine manuelle Vorbereitung der iBP-Datei nötig.
 
 ## Mehrere Personen unterscheiden – `--name`
 
@@ -62,6 +74,18 @@ Im Hauptdokument die jeweils passende PDF referenzieren, z. B.:
 ## Ausreißertage im Wochendiagramm (`--week-outliers`)
 
 Markiert zusätzlich einzelne Tage, deren Tagesmedian eine klinische Schwelle überschreitet (Standard: syst. > 135, diast. > 85 mmHg), als kleine Kreise neben dem IQR-Marker.
+
+## Individueller Zielkorridor (`--corridor`)
+
+Standardmäßig zeigen beide Diagramme den allgemeinen ESC-orientierten Zielkorridor (120–129 mmHg systolisch, 70–79 mmHg diastolisch). Bei besonderen Indikationen — etwa einem Aortenaneurysma, für das ein niedrigerer Druck angeraten wird — lässt sich ein eigener Korridor angeben:
+
+```bash
+python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --corridor 110-119/70-79
+```
+
+Das Format ist `sys_lo-sys_hi/dia_lo-dia_hi`. Ohne die Option bleibt der ESC-Standardkorridor unverändert. Weicht der Korridor vom Standard ab, wird das an mehreren Stellen deutlich gekennzeichnet, damit es nicht übersehen wird: in der Legende, im erläuternden Absatz, in den Bildunterschriften und als sichtbarer Hinweis direkt in beiden Diagrammen. Mit `--corridor-label` lässt sich die Kurzbezeichnung anpassen (z. B. `--corridor-label Aneurysma`).
+
+Hinweis: Der Korridor ist eine Orientierungshilfe für die Darstellung, keine ärztliche Zielwertfestlegung — die konkreten Zielwerte legt die behandelnde Ärztin oder der behandelnde Arzt fest.
 
 ## Alle Optionen
 

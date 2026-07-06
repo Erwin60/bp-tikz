@@ -55,6 +55,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
+import sys
 import math
 import re
 from collections import defaultdict
@@ -72,18 +74,48 @@ DATE_FORMATS = [
     "%d/%m/%y",
 ]
 
-# Shared explanation of the recurring reference elements (ESC corridors and
+# Shared explanation of the recurring reference elements (target corridors and
 # HBPM comparison lines). It is stated once per output so the two figure
 # captions can cross-reference it instead of repeating it. The captions say
-# "siehe Absatz oben"; this text supplies that paragraph.
-REFERENCE_LINES_NOTE = (
-    "Die hellgrauen Korridore 120--129\\,mmHg systolisch und 70--79\\,mmHg "
-    "diastolisch sind allgemeine ESC-Orientierungen unter Therapie bei "
-    "individueller Verträglichkeit und keine aneurysmaspezifischen "
-    "Zielwertlinien. Die punktierten Linien bei 135\\,mmHg systolisch und "
-    "85\\,mmHg diastolisch markieren häufig verwendete häusliche "
-    "Vergleichsschwellen. Diese Referenzlinien gelten für beide Abbildungen."
-)
+# "siehe Absatz oben"; this text supplies that paragraph. The corridor bounds
+# are configurable; the default is the general ESC orientation range.
+def build_reference_note(
+    corridor_sys_lo: float = 120.0,
+    corridor_sys_hi: float = 129.0,
+    corridor_dia_lo: float = 70.0,
+    corridor_dia_hi: float = 79.0,
+    corridor_is_custom: bool = False,
+    corridor_label: str = "ESC",
+) -> str:
+    cs_lo, cs_hi = f"{corridor_sys_lo:g}", f"{corridor_sys_hi:g}"
+    cd_lo, cd_hi = f"{corridor_dia_lo:g}", f"{corridor_dia_hi:g}"
+    if corridor_is_custom:
+        # A patient-specific (e.g. aneurysm) corridor: state it explicitly and
+        # flag that it is a specifically chosen, stricter target.
+        corridor_sentence = (
+            f"Die hellgrauen Korridore {cs_lo}--{cs_hi}\\,mmHg systolisch und "
+            f"{cd_lo}--{cd_hi}\\,mmHg diastolisch sind ein \\textbf{{individuell "
+            f"gewählter, spezifischer Zielkorridor}} (hier {corridor_label}) und "
+            f"nicht die allgemeine ESC-Orientierung."
+        )
+    else:
+        corridor_sentence = (
+            f"Die hellgrauen Korridore {cs_lo}--{cs_hi}\\,mmHg systolisch und "
+            f"{cd_lo}--{cd_hi}\\,mmHg diastolisch sind allgemeine "
+            f"{corridor_label}-Orientierungen unter Therapie bei individueller "
+            f"Verträglichkeit und keine aneurysmaspezifischen Zielwertlinien."
+        )
+    return (
+        corridor_sentence
+        + " Die punktierten Linien bei 135\\,mmHg systolisch und 85\\,mmHg "
+        "diastolisch markieren häufig verwendete häusliche Vergleichsschwellen. "
+        "Diese Referenzlinien gelten für beide Abbildungen."
+    )
+
+
+# Backwards-compatible default note (unchanged ESC corridor) for any callers
+# that reference the old constant name.
+REFERENCE_LINES_NOTE = build_reference_note()
 
 
 COLUMN_ALIASES = {
@@ -285,13 +317,25 @@ def dialect_from_delimiter(delimiter: str) -> csv.Dialect:
 
 def detect_delimiter(path: Path) -> Tuple[csv.Dialect, str]:
     sample = path.read_text(encoding="utf-8-sig", errors="replace")[:4096]
+    return detect_delimiter_text(sample)
+
+
+def detect_delimiter_text(text: str) -> Tuple[csv.Dialect, str]:
+    sample = text[:4096]
+    # Count the delimiter candidates on the header line for a robust guess
+    # (Sniffer can be fooled by spaces in column names).
+    first_line = sample.splitlines()[0] if sample.splitlines() else ""
+    counts = {",": first_line.count(","), ";": first_line.count(";"), "\t": first_line.count("\t")}
+    best = max(counts, key=counts.get)
+    if counts[best] > 0:
+        return dialect_from_delimiter({",": "comma", ";": "semicolon", "\t": "tab"}[best]), \
+            {",": "comma", ";": "semicolon", "\t": "tab"}[best]
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
         delim = dialect.delimiter
     except csv.Error:
         dialect = dialect_from_delimiter("comma")
         delim = ","
-
     name = {",": "comma", ";": "semicolon", "\t": "tab"}.get(delim, repr(delim))
     return dialect, name
 
@@ -312,14 +356,70 @@ def find_column(headers: Sequence[str], canonical: str, required: bool = True) -
     return None
 
 
+def streamline_ibp(raw: str) -> str:
+    """Normalisiert das iBP-Export-CSV in ein kanonisches Format.
+
+    Die iBP-App exportiert eine Kopfzeile mit acht Spalten
+    (Systolic,Diastolic,Pulse,Weight,Mean Arterial Pressure,Pulse Pressure,
+    Date,Note), legt aber Datum UND Uhrzeit als ZWEI komma-getrennte Felder im
+    Date-Bereich ab (z. B. ``05.07.26, 20:23``). Dadurch hat jede Datenzeile ein
+    Feld mehr als die Kopfzeile, die Uhrzeit rutscht in die Note-Spalte und die
+    eigentliche Notiz in ein ueberzaehliges Feld.
+
+    Diese Funktion erkennt dieses Format eindeutig und schreibt es in ein
+    sauberes, semikolongetrenntes CSV mit den Spalten
+    ``Datum;Zeit;Systolisch;Diastolisch;Puls;note`` um, das anschliessend wie
+    ein normales (z. B. aus Excel exportiertes) CSV verarbeitet werden kann.
+    Nicht-iBP-Dateien werden unveraendert zurueckgegeben.
+    """
+    lines = [l for l in raw.splitlines() if l.strip() != ""]
+    if not lines:
+        return raw
+    header = lines[0]
+    hl = header.lower()
+    is_ibp = (
+        "mean arterial pressure" in hl
+        and "pulse pressure" in hl
+        and header.count(",") >= 6
+    )
+    if not is_ibp:
+        return raw
+    n_head = header.count(",") + 1
+
+    out = ["Datum;Zeit;Systolisch;Diastolisch;Puls;note"]
+    for fields in csv.reader(lines[1:]):
+        if not fields or all(f.strip() == "" for f in fields):
+            continue
+        if len(fields) < n_head:
+            continue
+        try:
+            sys_v = fields[0].strip()
+            dia_v = fields[1].strip()
+            pulse_v = fields[2].strip()
+            date_v = fields[6].strip()
+            time_v = fields[7].strip()
+            note_v = ",".join(fields[8:]).strip() if len(fields) > 8 else ""
+        except IndexError:
+            continue
+        note_v = note_v.replace(";", ",")
+        out.append(f"{date_v};{time_v};{sys_v};{dia_v};{pulse_v};{note_v}")
+    return "\n".join(out) + "\n"
+
+
 def read_csv(path: Path, date_from: date, date_to: Optional[date], delimiter: str = "auto") -> Tuple[List[Reading], str]:
+    # Read raw text and normalise the iBP export format first; other formats
+    # (e.g. exported from Excel) pass through unchanged.
+    raw = path.read_text(encoding="utf-8-sig", errors="replace")
+    raw = streamline_ibp(raw)
+
     if delimiter == "auto":
-        dialect, delimiter_name = detect_delimiter(path)
+        dialect, delimiter_name = detect_delimiter_text(raw)
     else:
         dialect = dialect_from_delimiter(delimiter)
         delimiter_name = delimiter
     readings: List[Reading] = []
-    with path.open(newline="", encoding="utf-8-sig", errors="replace") as f:
+    f = io.StringIO(raw)
+    if True:
         reader = csv.DictReader(f, dialect=dialect)
         if not reader.fieldnames:
             raise ValueError("CSV has no header row")
@@ -594,9 +694,44 @@ def generate_latex(
     week_outlier_sys_lo: Optional[float] = None,
     week_outlier_dia_lo: Optional[float] = None,
     week_central: str = "mean",
+    corridor_sys_lo: float = 120.0,
+    corridor_sys_hi: float = 129.0,
+    corridor_dia_lo: float = 70.0,
+    corridor_dia_hi: float = 79.0,
+    corridor_is_custom: bool = False,
+    corridor_label: str = "ESC",
 ) -> str:
     if not daily:
         raise ValueError("No daily statistics available")
+
+    # Formatted corridor numbers for reuse in plots, legends and captions.
+    cs_lo, cs_hi = f"{corridor_sys_lo:g}", f"{corridor_sys_hi:g}"
+    cd_lo, cd_hi = f"{corridor_dia_lo:g}", f"{corridor_dia_hi:g}"
+
+    # Reference-lines paragraph, built for the (possibly custom) corridor.
+    reference_note = build_reference_note(
+        corridor_sys_lo, corridor_sys_hi, corridor_dia_lo, corridor_dia_hi,
+        corridor_is_custom, corridor_label,
+    )
+
+    # When a custom (e.g. aneurysm-specific) corridor is used, add a visible
+    # marker inside each chart so the stricter target is not overlooked.
+    if corridor_is_custom:
+        corridor_note_text = (
+            rf"Individueller Zielkorridor {cs_lo}--{cs_hi}/{cd_lo}--{cd_hi}\,mmHg"
+        )
+        # Place relative to the axis' top edge (not at absolute data values) so
+        # the position scales with any y-range. anchor=north east keeps it just
+        # inside the top-right corner, above the "n=" labels.
+        daily_corridor_annotation = (
+            rf"\node[anchor=north east, font=\scriptsize\bfseries, "
+            rf"fill=white, fill opacity=0.75, text opacity=1, inner sep=1.5pt] "
+            rf"at ([yshift=1pt]rel axis cs:0.99,1.0) {{{corridor_note_text}}};"
+        )
+        weekly_corridor_annotation = daily_corridor_annotation
+    else:
+        daily_corridor_annotation = ""
+        weekly_corridor_annotation = ""
 
     weekly_coords = weekly_coordinates(blocks, central=week_central)
     # Legend/caption wording for the weekly central line depends on the choice.
@@ -776,7 +911,7 @@ def generate_latex(
 """
 
     text_paragraph = f"""
-Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis zum {actual_to.strftime('%d.%m.%Y')} insgesamt {total_readings} dokumentierte häusliche Blutdruckmessungen an {n_days} Kalendertagen vor. Für die Auswertung werden die Einzelmessungen zunächst pro Kalendertag zusammengefasst, damit Tage mit vielen Messungen nicht stärker gewichtet werden als Tage mit wenigen Messungen. Auf Basis der gleich nach Tagen gewichteten Tagesmittel ergibt sich ein durchschnittlicher häuslicher Blutdruck von ungefähr {avg_sys:.1f}/{avg_dia:.1f}\\,mmHg. Der Median der Tagesmediane liegt bei ungefähr {med_sys_med:.1f}/{med_dia_med:.1f}\\,mmHg. {under_135_85} von {n_days} Tagesmitteln lagen unter 135/85\\,mmHg. {REFERENCE_LINES_NOTE}
+Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis zum {actual_to.strftime('%d.%m.%Y')} insgesamt {total_readings} dokumentierte häusliche Blutdruckmessungen an {n_days} Kalendertagen vor. Für die Auswertung werden die Einzelmessungen zunächst pro Kalendertag zusammengefasst, damit Tage mit vielen Messungen nicht stärker gewichtet werden als Tage mit wenigen Messungen. Auf Basis der gleich nach Tagen gewichteten Tagesmittel ergibt sich ein durchschnittlicher häuslicher Blutdruck von ungefähr {avg_sys:.1f}/{avg_dia:.1f}\\,mmHg. Der Median der Tagesmediane liegt bei ungefähr {med_sys_med:.1f}/{med_dia_med:.1f}\\,mmHg. {under_135_85} von {n_days} Tagesmitteln lagen unter 135/85\\,mmHg. {reference_note}
 """
 
     fig1 = f"""
@@ -803,12 +938,12 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
     tick label style={{font=\\scriptsize}},
     label style={{font=\\small}},
 ]
-\\addplot[draw=none, fill=black!8] coordinates {{({xmin},120) ({xmax},120) ({xmax},129) ({xmin},129)}} \\closedcycle;
-\\addlegendentry{{ESC-Zielkorridor syst. 120--129}}
-\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},70) ({xmax},70) ({xmax},79) ({xmin},79)}} \\closedcycle;
-\\addlegendentry{{ESC-Zielkorridor diast. 70--79}}
-\\addplot[dashdotted, black] coordinates {{({xmin},129) ({xmax},129)}};
-\\addlegendentry{{Obergrenze ESC-Korridor syst. 129}}
+\\addplot[draw=none, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
+\\addlegendentry{{{corridor_label}-Zielkorridor syst. {cs_lo}--{cs_hi}}}
+\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
+\\addlegendentry{{{corridor_label}-Zielkorridor diast. {cd_lo}--{cd_hi}}}
+\\addplot[dashdotted, black] coordinates {{({xmin},{cs_hi}) ({xmax},{cs_hi})}};
+\\addlegendentry{{Obergrenze {corridor_label}-Korridor syst. {cs_hi}}}
 \\addplot[only marks, mark=|, mark size=7pt, black, error bars/.cd, y dir=both, y explicit] coordinates {{{daily_coords['sys_range']}}};
 \\addlegendentry{{Systolische Tages-Spannweite}}
 \\addplot[only marks, mark=*, mark size=1.4pt, black] coordinates {{{daily_coords['sys_median']}}};
@@ -823,6 +958,7 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
 \\addlegendentry{{HBPM-Vergleich diast. 85}}
 {daily_stub_annotation}
 {daily_n_annotation}
+{daily_corridor_annotation}
 \\end{{axis}}
 \\end{{tikzpicture}}
 \\caption{{Tagesweise Darstellung ab {date_from.strftime('%d.%m.%Y')}: Punkte zeigen den Tagesmedian, vertikale Balken die Tagesspannweite (Min--Max); Tage mit nur einer Messung haben keine sichtbare Spannweite. Zu Korridoren und Vergleichslinien siehe Absatz oben.{daily_n_caption_note}}}
@@ -876,12 +1012,12 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
     tick label style={{font=\\scriptsize}},
     label style={{font=\\small}},
 ]
-\\addplot[draw=none, fill=black!8] coordinates {{({xmin},120) ({xmax},120) ({xmax},129) ({xmin},129)}} \\closedcycle;
-\\addlegendentry{{ESC-Zielkorridor syst. 120--129}}
-\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},70) ({xmax},70) ({xmax},79) ({xmin},79)}} \\closedcycle;
-\\addlegendentry{{ESC-Zielkorridor diast. 70--79}}
-\\addplot[dashdotted, black] coordinates {{({xmin},129) ({xmax},129)}};
-\\addlegendentry{{Obergrenze ESC-Korridor syst. 129}}
+\\addplot[draw=none, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
+\\addlegendentry{{{corridor_label}-Zielkorridor syst. {cs_lo}--{cs_hi}}}
+\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
+\\addlegendentry{{{corridor_label}-Zielkorridor diast. {cd_lo}--{cd_hi}}}
+\\addplot[dashdotted, black] coordinates {{({xmin},{cs_hi}) ({xmax},{cs_hi})}};
+\\addlegendentry{{Obergrenze {corridor_label}-Korridor syst. {cs_hi}}}
 \\addplot[only marks, mark=|, mark size=7pt, black, error bars/.cd, y dir=both, y explicit] coordinates {{{weekly_coords['sys_iqr']}}};
 \\addlegendentry{{Systolischer IQR der Tagesmediane}}
 \\addplot[thick, mark=*, mark size=1.6pt, black] coordinates {{{weekly_coords['sys_mean']}}};
@@ -894,6 +1030,7 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
 \\addlegendentry{{HBPM-Vergleich syst. 135}}
 \\addplot[dotted, gray] coordinates {{({xmin},85) ({xmax},85)}};
 \\addlegendentry{{HBPM-Vergleich diast. 85}}
+{weekly_corridor_annotation}
 \\end{{axis}}
 \\end{{tikzpicture}}
 \\caption{{Verdichtete 7-Tage-Übersicht: {central_caption}; dies dämpft unregelmäßige Messhäufigkeit, ohne die Streuung ganz zu verbergen. Zu Korridoren und Vergleichslinien siehe Absatz oben.{outlier_caption_note}{incomplete_note}}}
@@ -918,7 +1055,8 @@ def extract_tikz_blocks_and_captions(fragment: str) -> Tuple[List[str], List[str
     return tikz_blocks, captions
 
 
-def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme") -> str:
+def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme",
+                                reference_note: str = REFERENCE_LINES_NOTE) -> str:
     """Build a standalone LaTeX file with both diagrams on one A4 page.
 
     Instead of cropping tightly to the content, the page is a real A4 sheet
@@ -966,7 +1104,7 @@ def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme"
 
 \sbox{{\headerbox}}{{\parbox{{\textwidth}}{{\centering
 \textbf{{\large {latex_escape(title)}}}\par\vspace{{2mm}}
-{{\footnotesize {REFERENCE_LINES_NOTE}\par}}}}}}
+{{\footnotesize {reference_note}\par}}}}}}
 
 \sbox{{\capAbox}}{{\parbox{{\textwidth}}{{\footnotesize \textbf{{Abbildung 1.}} {cap1}\par}}}}
 \sbox{{\capBbox}}{{\parbox{{\textwidth}}{{\footnotesize \textbf{{Abbildung 2.}} {cap2}\par}}}}
@@ -1004,6 +1142,7 @@ def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme"
 def generate_standalone_two_sides(
     fragment: str,
     fig_width_cm: float = 16.0,
+    reference_note: str = REFERENCE_LINES_NOTE,
 ) -> str:
     r"""Build a standalone LaTeX file in the "two sides" layout.
 
@@ -1028,7 +1167,7 @@ def generate_standalone_two_sides(
     # shared running paragraph, so the captions' "siehe Absatz oben" cross-
     # reference would dangle. Replace it on each page with the full shared
     # reference-lines note so every page stays self-contained.
-    ref_plain = REFERENCE_LINES_NOTE
+    ref_plain = reference_note
     cross_ref = "Zu Korridoren und Vergleichslinien siehe Absatz oben."
 
     def fix_caption(cap: str) -> str:
@@ -1122,11 +1261,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
                "  Zwei Personen:  python3 generate_bp_tikz.py --csv Eva.csv --date-from 15.05.2026 --name Eva\n"
                "                  python3 generate_bp_tikz.py --csv Adam.csv --date-from 15.05.2026 --name Adam\n"
                "  Wochen-Median:  python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --week-central median\n"
+               "  Aneurysma-Korridor: python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --corridor 110-119/70-79\n"
                "  Ausreisser:     python3 generate_bp_tikz.py --csv iBP.csv --date-from 15.05.2026 --week-outliers\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--csv", required=True, type=Path, help="Input CSV file with Date, Systolic and Diastolic columns.")
-    parser.add_argument("--date-from", required=True, help="First date to include, e.g. 2026-05-15 or 15.05.2026.")
+    parser.add_argument("--date-from", default=None, help="First date to include, e.g. 2026-05-15 or 15.05.2026. Without this option all readings from the earliest measurement are used.")
     parser.add_argument("--date-to", default=None, help="Last date to include. If omitted, all values from date-from onward are used.")
     parser.add_argument("--name", default=None, help="Optional person/run name used as a filename prefix for all output files (e.g. --name Eva -> Eva_bp_diagrams.tex, Eva_bp_diagrams_both_onepage_standalone.tex, ...). An explicit path option (--out, --standalone-out, ...) always overrides the prefixed default for that file.")
     parser.add_argument("--out", type=Path, default=None, help="Output LaTeX fragment path. Default: [name_]bp_diagrams.tex")
@@ -1145,6 +1285,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--week-outlier-sys-lo", type=float, default=None, help="Optional lower systolic threshold for weekly outlier days; if omitted, only high outliers are marked.")
     parser.add_argument("--week-outlier-dia-lo", type=float, default=None, help="Optional lower diastolic threshold for weekly outlier days; if omitted, only high outliers are marked.")
     parser.add_argument("--week-central", choices=["mean", "median"], default="mean", help="Central line of the weekly chart: 'mean' (default; nach Kalendertagen gewichteter Mittelwert der Tagesmittelwerte, an die klinischen HBPM/ESC-Mittelwertschwellen anschlussfähig) or 'median' (Median der Tagesmediane; konsistent zur IQR-Box und robuster gegen Ausreißertage).")
+    parser.add_argument("--corridor", default=None, metavar="SYS_LO-SYS_HI/DIA_LO-DIA_HI",
+                        help="Zielkorridor als 'sys_lo-sys_hi/dia_lo-dia_hi', z. B. '110-119/70-79' fuer einen aneurysmaspezifisch niedrigeren Korridor. Ohne Angabe bleibt der Standard (ESC-Orientierung 120-129/70-79). Ein abweichender Korridor wird in Legende, Absatz und Bildunterschrift als individuell gewaehlt gekennzeichnet.")
+    parser.add_argument("--corridor-label", default=None,
+                        help="Kurzbezeichnung des Zielkorridors in Legende/Text (z. B. 'individuell', 'Aneurysma'). Standard: 'ESC' beim Standardkorridor, sonst 'individuell'.")
     parser.add_argument("--no-daily-summary-label", action="store_true", help="Use only the simple x-axis label in the daily chart and suppress the automatic mean/median/<135/85 summary line.")
     parser.add_argument("--two-sides-out", type=Path, default=None, help="Output standalone LaTeX/TikZ file with each diagram on its own cropped page and the caption rendered as a node below the axis. Default: [name_]bp_diagrams_standalone_two_sides.tex")
     parser.add_argument("--no-two-sides", action="store_true", help="Do not write the two-sides standalone TikZ/LaTeX document.")
@@ -1154,9 +1298,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_arg_parser().parse_args()
-    date_from = parse_date(args.date_from)
+    # --date-from is optional: without it, use all readings from the earliest
+    # measurement (consistent with generate_bp_daytime_tikz.py).
+    date_from = parse_date(args.date_from) if args.date_from else None
     date_to = parse_date(args.date_to) if args.date_to else None
-    if date_to is not None and date_to < date_from:
+    if date_from is not None and date_to is not None and date_to < date_from:
         raise SystemExit("--date-to must be >= --date-from")
     if args.block_days <= 0:
         raise SystemExit("--block-days must be positive")
@@ -1184,11 +1330,63 @@ def main() -> int:
     # them without a path is not possible (they require a path), so they are
     # left exactly as given.
 
-    readings, delimiter_name = read_csv(args.csv, date_from, date_to, delimiter=args.delimiter)
+    # Read readings. If no --date-from was given, read everything (using a very
+    # early sentinel) and then set date_from to the earliest actual reading.
+    read_from = date_from if date_from is not None else date(1900, 1, 1)
+    readings, delimiter_name = read_csv(args.csv, read_from, date_to, delimiter=args.delimiter)
     if not readings:
         raise SystemExit("No valid readings in the requested date range")
+    if date_from is None:
+        dates_sorted = sorted(set(r.d for r in readings))
+        date_from = dates_sorted[0]
+        # Warn if the earliest date is a far outlier (likely a typo such as a
+        # wrong year), which would otherwise silently stretch the timeline.
+        if len(dates_sorted) >= 2 and (dates_sorted[1] - dates_sorted[0]).days > 90:
+            print(
+                f"WARNUNG: Das früheste Messdatum ({date_from.isoformat()}) liegt "
+                f"mehr als 90 Tage vor der nächsten Messung "
+                f"({dates_sorted[1].isoformat()}). Möglicher Datums-Tippfehler "
+                f"(z. B. falsches Jahr)? Andernfalls --date-from setzen.",
+                file=sys.stderr,
+            )
     daily = aggregate_daily(readings, date_from)
     blocks = aggregate_blocks(daily, date_from, block_days=args.block_days)
+
+    # Resolve the target corridor. Default is the ESC orientation range; a
+    # custom corridor (e.g. aneurysm-specific 110-119/70-79) is parsed from
+    # --corridor "sys_lo-sys_hi/dia_lo-dia_hi" and flagged as custom so it is
+    # marked in legend, paragraph and captions.
+    corridor_sys_lo, corridor_sys_hi = 120.0, 129.0
+    corridor_dia_lo, corridor_dia_hi = 70.0, 79.0
+    corridor_is_custom = False
+    corridor_label = "ESC"
+    if args.corridor:
+        try:
+            sys_part, dia_part = args.corridor.split("/")
+            corridor_sys_lo, corridor_sys_hi = (float(x) for x in sys_part.split("-"))
+            corridor_dia_lo, corridor_dia_hi = (float(x) for x in dia_part.split("-"))
+        except ValueError:
+            raise SystemExit(
+                "--corridor must look like '110-119/70-79' "
+                "(sys_lo-sys_hi/dia_lo-dia_hi)"
+            )
+        if corridor_sys_lo >= corridor_sys_hi or corridor_dia_lo >= corridor_dia_hi:
+            raise SystemExit("--corridor bounds must be lo < hi for both syst. and diast.")
+        # Custom unless it exactly equals the ESC default.
+        corridor_is_custom = not (
+            corridor_sys_lo == 120.0 and corridor_sys_hi == 129.0
+            and corridor_dia_lo == 70.0 and corridor_dia_hi == 79.0
+        )
+        corridor_label = args.corridor_label or ("individuell" if corridor_is_custom else "ESC")
+    elif args.corridor_label:
+        corridor_label = args.corridor_label
+
+    corridor_kwargs = dict(
+        corridor_sys_lo=corridor_sys_lo, corridor_sys_hi=corridor_sys_hi,
+        corridor_dia_lo=corridor_dia_lo, corridor_dia_hi=corridor_dia_hi,
+        corridor_is_custom=corridor_is_custom, corridor_label=corridor_label,
+    )
+    reference_note = build_reference_note(**corridor_kwargs)
 
     latex = generate_latex(
         daily,
@@ -1206,19 +1404,22 @@ def main() -> int:
         week_outlier_sys_lo=args.week_outlier_sys_lo,
         week_outlier_dia_lo=args.week_outlier_dia_lo,
         week_central=args.week_central,
+        **corridor_kwargs,
     )
     args.out.write_text(latex, encoding="utf-8")
 
     standalone_path: Optional[Path] = None
     if not args.no_standalone:
         standalone_path = args.standalone_out
-        standalone_tex = generate_standalone_onepage(latex, title=args.standalone_title)
+        standalone_tex = generate_standalone_onepage(
+            latex, title=args.standalone_title, reference_note=reference_note)
         standalone_path.write_text(standalone_tex, encoding="utf-8")
 
     two_sides_path: Optional[Path] = None
     if not args.no_two_sides:
         two_sides_path = args.two_sides_out
-        two_sides_tex = generate_standalone_two_sides(latex, fig_width_cm=args.two_sides_width_cm)
+        two_sides_tex = generate_standalone_two_sides(
+            latex, fig_width_cm=args.two_sides_width_cm, reference_note=reference_note)
         two_sides_path.write_text(two_sides_tex, encoding="utf-8")
 
     if args.daily_stats:

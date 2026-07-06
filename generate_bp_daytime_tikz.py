@@ -160,6 +160,67 @@ def _extract_hour(*fields):
     return None
 
 
+def streamline_ibp(raw):
+    """Normalisiert das iBP-Export-CSV in ein kanonisches Format.
+
+    Die iBP-App exportiert eine Kopfzeile mit acht Spalten
+    (Systolic,Diastolic,Pulse,Weight,Mean Arterial Pressure,Pulse Pressure,
+    Date,Note), legt aber Datum UND Uhrzeit als ZWEI komma-getrennte Felder im
+    Date-Bereich ab (z. B. ``05.07.26, 20:23``). Dadurch hat jede Datenzeile ein
+    Feld mehr als die Kopfzeile, die Uhrzeit rutscht in die Note-Spalte und die
+    eigentliche Notiz in ein ueberzaehliges Feld.
+
+    Diese Funktion erkennt dieses Format eindeutig und schreibt es in ein
+    sauberes, semikolongetrenntes CSV mit den Spalten
+    ``Datum;Zeit;Systolisch;Diastolisch;Puls;note`` um, das anschliessend wie
+    ein normales (z. B. aus Excel exportiertes) CSV verarbeitet werden kann.
+    Nicht-iBP-Dateien werden unveraendert zurueckgegeben.
+    """
+    lines = [l for l in raw.splitlines() if l.strip() != ""]
+    if not lines:
+        return raw
+    header = lines[0]
+    hl = header.lower()
+    # Eindeutige iBP-Signatur: die beiden iBP-spezifischen Spalten sind vorhanden
+    # und die Datenzeilen tragen (durch das komma-getrennte Datum/Uhrzeit) ein
+    # Feld mehr als die Kopfzeile.
+    is_ibp = (
+        "mean arterial pressure" in hl
+        and "pulse pressure" in hl
+        and header.count(",") >= 6
+    )
+    if not is_ibp:
+        return raw
+    n_head = header.count(",") + 1
+
+    out = ["Datum;Zeit;Systolisch;Diastolisch;Puls;note"]
+    reader = csv.reader(lines[1:])
+    for fields in reader:
+        if not fields or all(f.strip() == "" for f in fields):
+            continue
+        # Bei iBP hat die Zeile ein Feld mehr als die Kopfzeile: Systolic,
+        # Diastolic, Pulse, Weight, MAP, PP, Date, Time, Note.
+        # Wir greifen die benoetigten Werte positionsbasiert ab; ueberzaehlige
+        # (Note kann selbst Kommas enthalten) werden am Ende zusammengefasst.
+        if len(fields) < n_head:
+            continue
+        try:
+            sys_v = fields[0].strip()
+            dia_v = fields[1].strip()
+            pulse_v = fields[2].strip()
+            # Date und Time liegen an Position 6 und 7 (0-basiert), Note ab 8.
+            date_v = fields[6].strip()
+            time_v = fields[7].strip()
+            note_v = ",".join(fields[8:]).strip() if len(fields) > 8 else ""
+        except IndexError:
+            continue
+        # Semikolons in der Notiz maskieren wir simpel, um das Zielformat nicht
+        # zu zerstoeren.
+        note_v = note_v.replace(";", ",")
+        out.append(f"{date_v};{time_v};{sys_v};{dia_v};{pulse_v};{note_v}")
+    return "\n".join(out) + "\n"
+
+
 def read_rows(path):
     """Liest ein Blutdruck-CSV robust ein.
 
@@ -173,6 +234,10 @@ def read_rows(path):
     raw = open(path, encoding="utf-8-sig", errors="replace").read()
     if not raw.strip():
         sys.exit(f"CSV ist leer: {path}")
+
+    # iBP-Export zuerst in ein kanonisches CSV normalisieren; andere Formate
+    # (z. B. aus Excel) bleiben unveraendert.
+    raw = streamline_ibp(raw)
 
     # Delimiter robust erkennen: zuerst anhand der Kopfzeile ausz\u00e4hlen
     # (zuverlaessiger als Sniffer bei Spaltennamen mit Leerzeichen),
@@ -436,6 +501,20 @@ def fmt(med):
 def build_profile_plot(sys_p, dia_p, st):
     """Abbildung 1: Tagesprofil mit IQR-Baendern + Medianlinien."""
     x = {"Morgen": 1, "Mittag": 2, "Abend": 3}
+    # Visible marker when a custom (e.g. aneurysm) corridor is in use.
+    if st.get("corridor_is_custom"):
+        cs_lo, cs_hi = f"{st['corridor_sys'][0]:g}", f"{st['corridor_sys'][1]:g}"
+        cd_lo, cd_hi = f"{st['corridor_dia'][0]:g}", f"{st['corridor_dia'][1]:g}"
+        # Relative to the axis' top edge so it scales with the y-range and
+        # stays just inside the top-right corner regardless of data values.
+        corridor_annotation = (
+            rf"\node[anchor=north east,font=\scriptsize\bfseries,fill=white,"
+            rf"fill opacity=0.75,text opacity=1,inner sep=1.5pt] "
+            rf"at ([yshift=1pt]rel axis cs:0.99,1.0) "
+            rf"{{Individueller Zielkorridor {cs_lo}--{cs_hi}/{cd_lo}--{cd_hi}\,mmHg}};"
+        )
+    else:
+        corridor_annotation = ""
     # Baender nur fuer vorhandene Bloecke; fehlende ueberspringen.
     def coords(profile, which):
         pts = []
@@ -476,8 +555,8 @@ def build_profile_plot(sys_p, dia_p, st):
     legend style={{at={{(0.5,-0.16)}},anchor=north,legend columns=2,font=\scriptsize,draw=gray!50}},
     legend image post style={{scale=1.5}},
 ]
-\fill[{st['corridor_fill']}] (axis cs:0.7,120) rectangle (axis cs:3.3,129);
-\fill[{st['corridor_fill']}] (axis cs:0.7,70) rectangle (axis cs:3.3,79);
+\fill[{st['corridor_fill']}] (axis cs:0.7,{st['corridor_sys'][0]}) rectangle (axis cs:3.3,{st['corridor_sys'][1]});
+\fill[{st['corridor_fill']}] (axis cs:0.7,{st['corridor_dia'][0]}) rectangle (axis cs:3.3,{st['corridor_dia'][1]});
 \addplot[name path=syshi,draw=none,forget plot] coordinates {{{coords(sys_p,'hi')}}};
 \addplot[name path=syslo,draw=none,forget plot] coordinates {{{coords(sys_p,'lo')}}};
 \addplot[{st['band_sys']},forget plot] fill between[of=syshi and syslo];
@@ -492,6 +571,7 @@ def build_profile_plot(sys_p, dia_p, st):
    node[pos=0.9,above,font=\tiny,{st['thresh']}]{{135 syst.}};
 \draw[densely dotted,thick,{st['thresh']}] (axis cs:0.7,85) -- (axis cs:3.3,85)
    node[pos=0.9,above,font=\tiny,{st['thresh']}]{{85 diast.}};
+{corridor_annotation}
 {n_nodes}
 \end{{axis}}
 \end{{tikzpicture}}"""
@@ -663,8 +743,16 @@ def build_weekday_plot(wd, outl, st, metric, ymin, ymax, ylabel, title,
 \end{{tikzpicture}}"""
 
 
-def build_document(rows, style, morning_end, midday_end, direction="up"):
+def build_document(rows, style, morning_end, midday_end, direction="up",
+                   corridor_sys=(120, 129), corridor_dia=(70, 79),
+                   corridor_is_custom=False, corridor_label="ESC"):
     st = style_defs(style)
+    # Thread the (possibly custom) target corridor through the style dict so
+    # the plot builders can draw and label it without extra parameters.
+    st["corridor_sys"] = corridor_sys
+    st["corridor_dia"] = corridor_dia
+    st["corridor_is_custom"] = corridor_is_custom
+    st["corridor_label"] = corridor_label
     sys_p = agg_profile(rows, 2, morning_end, midday_end)
     dia_p = agg_profile(rows, 3, morning_end, midday_end)
     wd_sys = agg_weekday_block(rows, 2, morning_end, midday_end)
@@ -685,6 +773,16 @@ def build_document(rows, style, morning_end, midday_end, direction="up"):
     n_days = len({r[0] for r in rows})
     # Auswertungszeitraum (von--bis) aus den tatsaechlichen Daten
     all_dates = sorted(r[0] for r in rows)
+    # Warnung bei verdaechtig grosser Luecke am Anfang (moeglicher Datums-Tippfehler).
+    uniq_dates = sorted(set(all_dates))
+    if len(uniq_dates) >= 2 and (uniq_dates[1] - uniq_dates[0]).days > 90:
+        print(
+            f"WARNUNG: Das frueheste Messdatum ({uniq_dates[0].strftime('%d.%m.%Y')}) "
+            f"liegt mehr als 90 Tage vor der naechsten Messung "
+            f"({uniq_dates[1].strftime('%d.%m.%Y')}). Moeglicher Datums-Tippfehler "
+            f"(z. B. falsches Jahr)? Andernfalls --date-from setzen.",
+            file=sys.stderr,
+        )
     date_from = all_dates[0].strftime("%d.%m.%Y")
     date_to = all_dates[-1].strftime("%d.%m.%Y")
     if date_from == date_to:
@@ -769,17 +867,62 @@ def build_document(rows, style, morning_end, midday_end, direction="up"):
 
     profile_tex = build_profile_plot(sys_p, dia_p, st)
     hist_tex = build_hour_histogram(rows, st, morning_end, midday_end)
+
+    # Y-Achsengrenzen datenabhaengig bestimmen, damit kein Balken oder
+    # Ausreisser ausserhalb des Bereichs liegt (fixe Grenzen konnten z. B. einen
+    # niedrigen Sonntag-Mittag-Median unter ymin abschneiden). Es werden alle
+    # Blockmediane, alle Ausreisser, der Korridor und die Vergleichsschwelle
+    # einbezogen; anschliessend etwas Luft ergaenzt.
+    def axis_bounds(wd, outl, corridor, thresh, fallback):
+        vals = [v for v in wd.values() if v is not None]
+        for cell in outl.values():
+            vals += list(cell.get("hi", [])) + list(cell.get("lo", []))
+        if corridor:
+            vals += [corridor[0], corridor[1]]
+        if thresh is not None:
+            vals.append(thresh)
+        if not vals:
+            return fallback
+        lo = min(vals) - 6
+        hi = max(vals) + 6
+        # Auf ganze 2er runden fuer saubere Ticks.
+        lo = int(lo // 2 * 2)
+        hi = int((hi + 1) // 2 * 2)
+        return lo, hi
+
+    sys_lo, sys_hi = axis_bounds(wd_sys, ol_sys, st['corridor_sys'], 135, (110, 146))
+    dia_lo, dia_hi = axis_bounds(wd_dia, ol_dia, st['corridor_dia'], 85, (60, 92))
+
     wd_sys_tex = build_weekday_plot(
-        wd_sys, ol_sys, st, "sys", 110, 146, "Systolisch [mmHg]",
+        wd_sys, ol_sys, st, "sys", sys_lo, sys_hi, "Systolisch [mmHg]",
         "Abb.~2a: Systolischer Median je Wochentag und Tageszeit",
-        block_labels, thresh=135, corridor=(120, 129))
+        block_labels, thresh=135, corridor=st['corridor_sys'])
     wd_dia_tex = build_weekday_plot(
-        wd_dia, ol_dia, st, "dia", 60, 92, "Diastolisch [mmHg]",
+        wd_dia, ol_dia, st, "dia", dia_lo, dia_hi, "Diastolisch [mmHg]",
         "Abb.~2b: Diastolischer Median je Wochentag und Tageszeit",
-        block_labels, xlabel="Wochentag", thresh=85, corridor=(70, 79))
+        block_labels, xlabel="Wochentag", thresh=85, corridor=st['corridor_dia'])
 
     style_note = ("Farbkodiert" if style == "color"
                   else "Schwarz-Wei\\ss{} (Graustufen und Muster: solide / schraffiert / punktiert)")
+
+    # Corridor description for the methodik box; adapts to a custom corridor.
+    cs_lo, cs_hi = f"{st['corridor_sys'][0]:g}", f"{st['corridor_sys'][1]:g}"
+    cd_lo, cd_hi = f"{st['corridor_dia'][0]:g}", f"{st['corridor_dia'][1]:g}"
+    if st['corridor_is_custom']:
+        corridor_sentence = (
+            rf"die \textbf{{grau hinterlegten Korridore}} ({cs_lo}--{cs_hi}\,mmHg "
+            rf"systolisch, {cd_lo}--{cd_hi}\,mmHg diastolisch) sind ein "
+            rf"\textbf{{individuell gew\"ahlter, spezifischer Zielkorridor}} "
+            rf"(hier {st['corridor_label']}) und nicht die allgemeine "
+            rf"ESC-Orientierung"
+        )
+    else:
+        corridor_sentence = (
+            rf"die \textbf{{grau hinterlegten Korridore}} ({cs_lo}--{cs_hi}\,mmHg "
+            rf"systolisch, {cd_lo}--{cd_hi}\,mmHg diastolisch) sind allgemeine "
+            rf"ESC-Orientierungsbereiche unter Therapie bei individueller "
+            rf"Vertr\"aglichkeit und keine aneurysmaspezifischen Zielwerte"
+        )
 
     return rf"""\documentclass[11pt]{{article}}
 \usepackage[ngerman]{{babel}}
@@ -802,7 +945,7 @@ def build_document(rows, style, morning_end, midday_end, direction="up"):
 \vspace{{1mm}}
 
 \noindent\fbox{{\parbox{{\dimexpr\textwidth-2\fboxsep-2\fboxrule\relax}}{{\footnotesize
-\textbf{{Methodik und Lesehilfe.}} Grundlage sind die h\"auslichen Blutdruckmessungen ({n_total} Messungen an {n_days} Tagen), eingeteilt in drei Tageszeitbl\"ocke: \emph{{Morgen}} ($<${morning_end}:00), \emph{{Mittag}} ({morning_end}:00--{midday_end}:00) und \emph{{Abend}} ($>${midday_end}:00). Alle Balken und Linien sind \emph{{median}}-basiert\footnotemark[1], schattierte B\"ander bzw.\ die grau hinterlegten Korridore dienen der Streuungs- und Vergleichsdarstellung. Abbildung~1 zeigt das gemittelte \emph{{Tagesprofil}} (Median je Block; schattiert der Interquartilsbereich, 25.--75.\ Perzentil). Abbildung~2 schl\"usselt die Mediane nach Wochentag auf; kleine Kreise markieren \emph{{Ausrei\ss{{}}er}}\footnotemark[2]. Die Zahl \texttt{{n}} nennt die Anzahl der Messungen. Die punktierten Linien markieren die h\"auslichen Vergleichsschwellen 135\,mmHg systolisch bzw.\ 85\,mmHg diastolisch; die \textbf{{grau hinterlegten Korridore}} (120--129\,mmHg systolisch, 70--79\,mmHg diastolisch) sind allgemeine ESC-Orientierungsbereiche unter Therapie bei individueller Vertr\"aglichkeit und keine aneurysmaspezifischen Zielwerte. \textbf{{Hinweis zur Datenlage:}} {datenlage} Die Darstellung ersetzt keine \"arztliche Zielwertfestlegung.}}}}
+\textbf{{Methodik und Lesehilfe.}} Grundlage sind die h\"auslichen Blutdruckmessungen ({n_total} Messungen an {n_days} Tagen), eingeteilt in drei Tageszeitbl\"ocke: \emph{{Morgen}} ($<${morning_end}:00), \emph{{Mittag}} ({morning_end}:00--{midday_end}:00) und \emph{{Abend}} ($>${midday_end}:00). Alle Balken und Linien sind \emph{{median}}-basiert\footnotemark[1], schattierte B\"ander bzw.\ die grau hinterlegten Korridore dienen der Streuungs- und Vergleichsdarstellung. Abbildung~1 zeigt das gemittelte \emph{{Tagesprofil}} (Median je Block; schattiert der Interquartilsbereich, 25.--75.\ Perzentil). Abbildung~2 schl\"usselt die Mediane nach Wochentag auf; kleine Kreise markieren \emph{{Ausrei\ss{{}}er}}\footnotemark[2]. Die Zahl \texttt{{n}} nennt die Anzahl der Messungen. Die punktierten Linien markieren die h\"auslichen Vergleichsschwellen 135\,mmHg systolisch bzw.\ 85\,mmHg diastolisch; {corridor_sentence}. \textbf{{Hinweis zur Datenlage:}} {datenlage} Die Darstellung ersetzt keine \"arztliche Zielwertfestlegung.}}}}
 \footnotetext[1]{{Der Median (50.\ Perzentil) wird gegen\"uber dem arithmetischen Mittel verwendet, weil er unempfindlich gegen einzelne Extremwerte ist und so kurzfristige Verzerrungen -- etwa durch eine einzelne Messung nach k\"orperlicher Belastung -- auff\"angt; die typische Lage der Werte wird dadurch realistischer abgebildet.}}
 \footnotetext[2]{{Ausrei\ss{{}}er nach der Tukey-Regel: ein Wert gilt als Ausrei\ss{{}}er, wenn er oberhalb von $Q_3+1{{,}}5\cdot\mathrm{{IQR}}$ (nach oben) oder unterhalb von $Q_1-1{{,}}5\cdot\mathrm{{IQR}}$ (nach unten) liegt, wobei $Q_1$ und $Q_3$ das 25.\ bzw.\ 75.\ Perzentil und $\mathrm{{IQR}}=Q_3-Q_1$ den Interquartilsabstand bezeichnen. Ausrei\ss{{}}er liegen damit definitionsgem\"a\ss{{}} \emph{{au\ss{{}}erhalb}} des mittleren Wertebereichs. Sie werden nur bestimmt, wenn je Zelle mindestens vier Messungen vorliegen und der Interquartilsabstand nicht entartet ist ($\mathrm{{IQR}}\geq 1$\,mmHg); andernfalls w\"urden bei nahezu identischen Werten Pseudo-Ausrei\ss{{}}er direkt am Median entstehen.}}
 \vspace{{4mm}}
@@ -841,7 +984,8 @@ def main():
                "  Minimal:        python3 generate_bp_daytime_tikz.py --csv iBP.csv\n"
                "  Zwei Personen:  python3 generate_bp_daytime_tikz.py --csv Eva.csv --name Eva\n"
                "                  python3 generate_bp_daytime_tikz.py --csv Adam.csv --name Adam\n"
-               "  Schwarz-Weiss:  python3 generate_bp_daytime_tikz.py --csv iBP.csv --style bw\n",
+               "  Schwarz-Weiss:  python3 generate_bp_daytime_tikz.py --csv iBP.csv --style bw\n"
+               "  Aneurysma-Korridor: python3 generate_bp_daytime_tikz.py --csv iBP.csv --corridor 110-119/70-79\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     ap.add_argument("--csv", default="bp.csv",
@@ -873,6 +1017,10 @@ def main():
                          "vor dem praefigierten Standardnamen. Standard: kein Praefix.")
     ap.add_argument("-o", "--out", default=None,
                     help="Ausgabedatei (.tex). Standard: [name_]bp_weekday_daytime.tex")
+    ap.add_argument("--corridor", default=None, metavar="SYS_LO-SYS_HI/DIA_LO-DIA_HI",
+                    help="Zielkorridor als 'sys_lo-sys_hi/dia_lo-dia_hi', z. B. '110-119/70-79' fuer einen aneurysmaspezifisch niedrigeren Korridor. Ohne Angabe bleibt der Standard (ESC 120-129/70-79). Ein abweichender Korridor wird im Methodik-Text und als sichtbarer Hinweis in Abb. 1 gekennzeichnet.")
+    ap.add_argument("--corridor-label", default=None,
+                    help="Kurzbezeichnung des Zielkorridors (z. B. 'Aneurysma', 'individuell'). Standard: 'ESC' bzw. 'individuell' bei abweichendem Korridor.")
     args = ap.parse_args()
 
     # Ausgabedateiname aufloesen: --name als Praefix, sofern --out nicht
@@ -917,7 +1065,31 @@ def main():
         sys.exit("Keine Messungen im gewaehlten Zeitraum (" + " ".join(span)
                  + f"). Eingelesen wurden {n_all} Messungen ueber den gesamten Datensatz.")
 
-    tex = build_document(rows, args.style, a, b, args.outliers)
+    # Zielkorridor aufloesen (Standard ESC 120-129/70-79).
+    corridor_sys, corridor_dia = (120, 129), (70, 79)
+    corridor_is_custom = False
+    corridor_label = "ESC"
+    if args.corridor:
+        try:
+            sys_part, dia_part = args.corridor.split("/")
+            corridor_sys = tuple(float(x) for x in sys_part.split("-"))
+            corridor_dia = tuple(float(x) for x in dia_part.split("-"))
+            if len(corridor_sys) != 2 or len(corridor_dia) != 2:
+                raise ValueError
+        except ValueError:
+            sys.exit("--corridor erwartet 'sys_lo-sys_hi/dia_lo-dia_hi', z. B. 110-119/70-79")
+        if corridor_sys[0] >= corridor_sys[1] or corridor_dia[0] >= corridor_dia[1]:
+            sys.exit("--corridor: es muss lo < hi fuer syst. und diast. gelten.")
+        corridor_is_custom = not (
+            corridor_sys == (120, 129) and corridor_dia == (70, 79))
+        corridor_label = args.corridor_label or ("individuell" if corridor_is_custom else "ESC")
+    elif args.corridor_label:
+        corridor_label = args.corridor_label
+
+    tex = build_document(rows, args.style, a, b, args.outliers,
+                         corridor_sys=corridor_sys, corridor_dia=corridor_dia,
+                         corridor_is_custom=corridor_is_custom,
+                         corridor_label=corridor_label)
     with open(args.out, "w") as f:
         f.write(tex)
     span_txt = ""

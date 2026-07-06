@@ -1,6 +1,6 @@
 Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
 --csv CSV,ja,"kein Standard, muss angegeben werden","Eingabedatei mit den Blutdruckmessungen. Die CSV muss mindestens Datum, systolischen und diastolischen Blutdruck enthalten.",--csv iBP_Readings.csv
---date-from DATE_FROM,ja,"kein Standard, muss angegeben werden",Startdatum der Auswertung. Alle Messungen vor diesem Datum werden ignoriert.,--date-from 15.05.2026
+--date-from DATE_FROM,nein,"None, alle ab frühestem Datum",Startdatum der Auswertung. Ohne Angabe werden alle Messungen ab dem frühesten Datum verwendet (wie beim daytime-Skript).,--date-from 15.05.2026
 --name NAME,nein,"None, kein Präfix","Präfix für alle Ausgabedateinamen, um z. B. zwei Personen zu unterscheiden (--name Eva -> Eva_bp_diagrams.tex usw.). Ein explizit gesetzter Pfad (--out, --standalone-out, --two-sides-out) hat Vorrang vor dem präfigierten Standardnamen.",--name Eva
 --date-to DATE_TO,nein,"None, also alle Werte ab --date-from","Enddatum der Auswertung. Wird es weggelassen, werden alle Messungen ab --date-from verwendet.",--date-to 20.06.2026
 --out OUT,nein,bp_diagrams.tex,Name der LaTeX-Fragmentdatei für die Einbindung in ein bestehendes Hauptdokument.,--out bp_diagrams_fragment.tex
@@ -19,6 +19,8 @@ Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
 --week-outlier-sys-lo SYS_LO,nein,"None, nur hohe Ausreißer",Optionale untere systolische Schwelle für Wochen-Ausreißer-Tage. Ohne Angabe werden nur hohe Ausreißer markiert.,--week-outlier-sys-lo 100
 --week-outlier-dia-lo DIA_LO,nein,"None, nur hohe Ausreißer",Optionale untere diastolische Schwelle für Wochen-Ausreißer-Tage. Ohne Angabe werden nur hohe Ausreißer markiert.,--week-outlier-dia-lo 60
 --week-central mean|median,nein,mean,"Mittellinie des Wochendiagramms: mean (nach Kalendertagen gewichteter Mittelwert der Tagesmittelwerte, anschlussfähig an die mittelwertbasierten HBPM/ESC-Schwellen) oder median (Median der Tagesmediane, konsistent zur IQR-Box und robuster gegen Ausreißertage).",--week-central median
+--corridor SYS_LO-SYS_HI/DIA_LO-DIA_HI,nein,None (Standard ESC 120-129/70-79),"Individueller Zielkorridor, z. B. '110-119/70-79' fuer einen aneurysmaspezifisch niedrigeren Korridor. Ohne Angabe bleibt der ESC-Standardkorridor. Ein abweichender Korridor wird in Legende, Referenzabsatz, Bildunterschrift UND als sichtbarer Hinweis in beiden Grafiken gekennzeichnet.",--corridor 110-119/70-79
+--corridor-label LABEL,nein,ESC (Standard) bzw. 'individuell' (custom),"Kurzbezeichnung des Zielkorridors in Legende/Text (z. B. 'Aneurysma', 'individuell').",--corridor-label Aneurysma
 --no-daily-summary-label,nein,"False, Zusammenfassungszeile wird gezeigt",Unterdrückt die Zusammenfassungszeile (Mittelwert/Median/Anteil unter Schwelle) unter dem Tagesdiagramm.,--no-daily-summary-label
 --two-sides-out TWO_SIDES_OUT,nein,bp_diagrams_standalone_two_sides.tex,"Erzeugt ein Standalone-Dokument, bei dem jedes Diagramm auf einer eigenen, eng zugeschnittenen Seite steht (Bildunterschrift als Knoten unter der Achse).",--two-sides-out bp_diagrams_standalone_two_sides.tex
 --no-two-sides,nein,"False, Two-Sides-Datei wird erzeugt",Unterdrückt die Erzeugung des Two-Sides-Standalone-Dokuments.,--no-two-sides

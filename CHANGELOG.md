@@ -3,6 +3,59 @@
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
+## [1.2.6] – 2026-07
+
+### Behoben
+- `generate_bp_daytime_tikz.py`: Balken konnten unsichtbar bleiben, wenn ein
+  Median ausserhalb der fest kodierten y-Achsengrenzen lag (z. B. ein
+  niedriger systolischer Sonntag-Mittag-Median unter der bisherigen
+  Untergrenze von 110 mmHg wurde abgeschnitten, waehrend der zugehoerige
+  diastolische Balken sichtbar blieb). Die y-Achsengrenzen von Abb. 2a/2b
+  werden nun datenabhaengig bestimmt und umfassen alle Mediane, Ausreisser,
+  den Zielkorridor und die Vergleichsschwelle.
+
+### Geändert
+- `--date-from` ist in `generate_bp_tikz.py` jetzt optional (vorher Pflicht).
+  Ohne Angabe werden alle Messungen ab dem frühesten Datum ausgewertet,
+  konsistent zu `generate_bp_daytime_tikz.py`. Damit verarbeiten beide
+  Skripte bei gleichem Aufruf dieselbe Datenmenge.
+
+### Hinzugefügt
+- Warnung in beiden Skripten, wenn das automatisch ermittelte früheste
+  Messdatum mehr als 90 Tage vor der nächsten Messung liegt (typischer
+  Hinweis auf einen Datums-Tippfehler wie ein falsches Jahr).
+- Automatische Normalisierung des iBP-Export-CSV („streamlining") in beiden
+  Skripten. Das iBP-Format legt Datum und Uhrzeit als zwei komma-getrennte
+  Felder ab, wodurch jede Datenzeile ein Feld mehr als die Kopfzeile hat und
+  Messungen bisher falsch zugeordnet oder verworfen werden konnten. Das Format
+  wird nun an seiner Signatur (Spalten „Mean Arterial Pressure"/„Pulse
+  Pressure" plus überzählige Feldzahl) erkannt und vor der eigentlichen
+  Verarbeitung in ein kanonisches CSV überführt. Normale (z. B. aus Excel
+  exportierte) CSVs bleiben unverändert. Siehe README, Abschnitt
+  „Eingabeformat und iBP-Normalisierung".
+
+### Behoben
+- Fehlende bzw. falsch zugeordnete Messwerte (u. a. einzelne Wochentag-Blöcke
+  im Tageszeit-Diagramm) bei direkter Verwendung eines unveränderten
+  iBP-Exports.
+
+## [1.2.5] – 2026-07
+
+### Hinzugefügt
+- `generate_bp_tikz.py`: konfigurierbarer Zielkorridor über
+  `--corridor sys_lo-sys_hi/dia_lo-dia_hi` (z. B. `110-119/70-79` für einen
+  aneurysmaspezifisch niedrigeren Korridor). Ohne Angabe bleibt der bisherige
+  ESC-Standardkorridor (120–129/70–79) unverändert. Ein abweichender Korridor
+  wird in Legende, Referenzabsatz und Bildunterschrift als individuell
+  gewählt gekennzeichnet und zusätzlich als sichtbarer Hinweis in beide
+  Diagramme eingeblendet, damit er nicht übersehen wird. Optionales
+  `--corridor-label` für die Kurzbezeichnung.
+- `generate_bp_daytime_tikz.py`: dieselbe `--corridor` /
+  `--corridor-label`-Unterstützung, konsistent zum Haupt-Skript. Der Korridor
+  wirkt auf das Tagesprofil (Abb. 1) und die Wochentag-Diagramme (Abb. 2a/2b);
+  bei abweichendem Korridor wird der Methodik-Text angepasst und ein
+  sichtbarer Hinweis in Abb. 1 eingeblendet.
+
 ## [1.2.4] – 2026-07
 
 ### Behoben
@@ -14,6 +67,15 @@ Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 ### Geändert
 - Beispiel-Namen in Doku und Skript-Hilfen von Adam/Eva verwendet
   (zuvor andere Vornamen).
+
+### Ergänzt (Release-Assets)
+- Beispiel-PDFs des Tageszeit-×-Wochentag-Diagramms in Farbe und
+  Schwarz-Weiß (`fig_weekday_daytime_color.pdf`,
+  `fig_weekday_daytime_bw.pdf`) neu erzeugt aus `bp_anon_example.csv`,
+  mit korrigierter Legendenplatzierung. Die früheren, fehlerhaften
+  Beispiele wurden ersetzt.
+- Einzelfiguren des Tages-/Wochendiagramms (`fig1`–`fig4b`) als farbige
+  Referenz beigelegt.
 
 ## [1.2.3] – 2026-06
 
