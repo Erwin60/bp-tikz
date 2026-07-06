@@ -1,5 +1,8 @@
 # bp-tikz
 
+[![DOI](https://zenodo.org/badge/1279557482.svg)](https://doi.org/10.5281/zenodo.21216463)
+
+Werkzeuge, die aus einer CSV mit häuslichen Blutdruckmessungen LaTeX/PGFPlots-Diagramme erzeugen.
 Werkzeuge, die aus einer CSV mit häuslichen Blutdruckmessungen LaTeX/PGFPlots-Diagramme erzeugen.
 
 Zwei Skripte:
