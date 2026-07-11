@@ -678,6 +678,42 @@ def xticks_for_blocks(blocks: Sequence[BlockStats]) -> Tuple[str, str]:
     return ticks, labels
 
 
+def xticks_for_trend(daily: Sequence[DailyStats]) -> Tuple[str, str]:
+    """Monatserste als Ticks (Label 'dd.mm'); bei kurzen Zeitraeumen wie das
+    Tagesdiagramm etwa sechs gleichmaessige Datums-Ticks."""
+    first, last = daily[0].d, daily[-1].d
+    baseline = first - timedelta(days=daily[0].day_index)
+    ticks: List[int] = []
+    labels: List[str] = []
+    m = first.replace(day=1)
+    while m <= last:
+        if m >= first:
+            ticks.append((m - baseline).days)
+            labels.append(m.strftime("%d.%m"))
+        m = (m.replace(day=28) + timedelta(days=4)).replace(day=1)
+    if len(ticks) < 3:  # Zeitraum zu kurz fuer Monatsticks
+        return xticks_for_daily(daily)
+    return ",".join(str(t) for t in ticks), ",".join(labels)
+
+
+def trend_coordinates(daily: Sequence[DailyStats], window: int) -> Dict[str, str]:
+    """Koordinaten fuer das Trend-Diagramm: Tagesmediane als Punkte plus ein
+    zentrierter gleitender Median ueber ein Kalenderfenster von `window` Tagen
+    (kalenderbasiert, d. h. Messluecken verbreitern das Fenster nicht)."""
+    half = max(0, (window - 1) // 2)
+    sys_pts = " ".join(coord_point(d.day_index, d.sys_median) for d in daily)
+    dia_pts = " ".join(coord_point(d.day_index, d.dia_median) for d in daily)
+    sys_roll, dia_roll = [], []
+    for d in daily:
+        win = [x for x in daily if abs(x.day_index - d.day_index) <= half]
+        sys_roll.append(coord_point(d.day_index, median([x.sys_median for x in win])))
+        dia_roll.append(coord_point(d.day_index, median([x.dia_median for x in win])))
+    return {
+        "sys_pts": sys_pts, "dia_pts": dia_pts,
+        "sys_roll": " ".join(sys_roll), "dia_roll": " ".join(dia_roll),
+    }
+
+
 def generate_latex(
     daily: Sequence[DailyStats],
     blocks: Sequence[BlockStats],
@@ -700,6 +736,8 @@ def generate_latex(
     corridor_dia_hi: float = 79.0,
     corridor_is_custom: bool = False,
     corridor_label: str = "ESC",
+    trend: bool = False,
+    trend_window: int = 7,
 ) -> str:
     if not daily:
         raise ValueError("No daily statistics available")
@@ -757,6 +795,17 @@ def generate_latex(
         weekly_outliers = {"sys_out": "", "dia_out": ""}
     daily_ticks, daily_labels = xticks_for_daily(daily)
     block_ticks, block_labels = xticks_for_blocks(blocks)
+    # Ab ~11 Bloecken ueberlappen die horizontalen Datumslabels des
+    # Wochendiagramms; dann werden sie um 45 Grad rotiert und verkleinert,
+    # und die Legende rueckt etwas tiefer, damit sie die schraegen Labels
+    # nicht ueberdruckt. Bei <= 10 Bloecken bleibt die Ausgabe unveraendert.
+    if len(blocks) > 10:
+        block_tick_style = ("    x tick label style={rotate=45, anchor=north east, "
+                            "font=\\tiny, inner sep=1.5pt},\n")
+        weekly_legend_y = "-0.34"
+    else:
+        block_tick_style = ""
+        weekly_legend_y = "-0.27"
     max_day = daily[-1].day_index
     xmax = max_day + 1
     xmin = -1
@@ -1008,7 +1057,7 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
     ylabel={{Blutdruck [mmHg]}},
     xtick={{{block_ticks}}},
     xticklabels={{{block_labels}}},
-    legend style={{font=\\scriptsize, at={{(0.5,-0.27)}}, anchor=north, legend columns=3, draw=none}},
+{block_tick_style}    legend style={{font=\\scriptsize, at={{(0.5,{weekly_legend_y})}}, anchor=north, legend columns=3, draw=none}},
     tick label style={{font=\\scriptsize}},
     label style={{font=\\small}},
 ]
@@ -1038,7 +1087,64 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
 \\end{{figure*}}
 """
 
-    return preamble_note + summary + text_paragraph + "\n" + fig1 + "\n" + fig2
+    # Optionales Trend-Diagramm (Abbildung 3): Tagesmediane als Punkte (keine
+    # Blockglaettung) plus zentrierter gleitender Median als Verlaufslinie.
+    # Fuer Halbjahres-/Jahresuebersichten, bei denen 7-Tage-Bloecke zu grob
+    # bzw. laengere Bloecke zu stark glaettend waeren.
+    fig3 = ""
+    if trend:
+        tc = trend_coordinates(daily, trend_window)
+        trend_ticks, trend_labels = xticks_for_trend(daily)
+        med_vals_sys = [d.sys_median for d in daily]
+        med_vals_dia = [d.dia_median for d in daily]
+        t_lo = int(math.floor(min(med_vals_dia + [corridor_dia_lo]) / 5.0) * 5) - 5
+        t_hi = int(math.ceil(max(med_vals_sys + [135.0, corridor_sys_hi]) / 5.0) * 5) + 5
+        win_txt = f"{trend_window}"
+        fig3 = f"""
+\\begin{{figure*}}[!t]
+\\centering
+\\begin{{tikzpicture}}
+\\begin{{axis}}[
+    width=0.95\\textwidth,
+    height=8.8cm,
+    ymin={t_lo},
+    ymax={t_hi},
+    xmin={xmin},
+    xmax={xmax},
+    grid=major,
+    xlabel={{Datum (Monatsanfaenge) | Zeitraum ab {date_from.strftime('%d.%m.%Y')}}},
+    ylabel={{Blutdruck [mmHg]}},
+    xtick={{{trend_ticks}}},
+    xticklabels={{{trend_labels}}},
+    legend style={{font=\\scriptsize, at={{(0.5,-0.15)}}, anchor=north, legend columns=3, draw=none}},
+    tick label style={{font=\\scriptsize}},
+    label style={{font=\\small}},
+]
+\\addplot[draw=none, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
+\\addlegendentry{{{corridor_label}-Zielkorridor syst. {cs_lo}--{cs_hi}}}
+\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
+\\addlegendentry{{{corridor_label}-Zielkorridor diast. {cd_lo}--{cd_hi}}}
+\\addplot[only marks, mark=*, mark size=0.55pt, black!45] coordinates {{{tc['sys_pts']}}};
+\\addlegendentry{{Tagesmedian syst. (Punkte)}}
+\\addplot[only marks, mark=*, mark size=0.55pt, gray!70] coordinates {{{tc['dia_pts']}}};
+\\addlegendentry{{Tagesmedian diast. (Punkte)}}
+\\addplot[very thick, black] coordinates {{{tc['sys_roll']}}};
+\\addlegendentry{{{win_txt}-Tage-Rollmedian syst.}}
+\\addplot[very thick, dashed, gray] coordinates {{{tc['dia_roll']}}};
+\\addlegendentry{{{win_txt}-Tage-Rollmedian diast.}}
+\\addplot[dotted, black] coordinates {{({xmin},135) ({xmax},135)}};
+\\addlegendentry{{HBPM-Vergleich syst. 135}}
+\\addplot[dotted, gray] coordinates {{({xmin},85) ({xmax},85)}};
+\\addlegendentry{{HBPM-Vergleich diast. 85}}
+{daily_corridor_annotation}
+\\end{{axis}}
+\\end{{tikzpicture}}
+\\caption{{Langzeit-Trend: Jeder Punkt ist der unveränderte Tagesmedian (keine Blockbildung); die Linien zeigen den zentrierten gleitenden {win_txt}-Tage-Median als Verlaufsglättung. Das Kalenderfenster überbrückt Messlücken, verbreitert sich dadurch aber nicht. Zu Korridoren und Vergleichslinien siehe Absatz oben.}}
+\\label{{fig:bp_trend}}
+\\end{{figure*}}
+"""
+
+    return preamble_note + summary + text_paragraph + "\n" + fig1 + "\n" + fig2 + fig3
 
 
 def extract_tikz_blocks_and_captions(fragment: str) -> Tuple[List[str], List[str]]:
@@ -1079,6 +1185,18 @@ def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme"
     # whose value is derived from the remaining vertical space at typeset time.
     block0 = tikz_blocks[0].replace("height=7.2cm", "height=\\chartheight")
     block1 = tikz_blocks[1].replace("height=6.8cm", "height=\\chartheight")
+
+    # Optionales Trend-Diagramm (--trend) auf einer eigenen zweiten A4-Seite,
+    # damit Seite 1 (Tages- + Wochendiagramm) unveraendert bleibt.
+    trend_section = ""
+    if len(tikz_blocks) >= 3:
+        cap3 = captions[2] if len(captions) >= 3 else "Langzeit-Trend der Tagesmediane."
+        block2 = tikz_blocks[2].replace("height=8.8cm", "height=12.5cm")
+        trend_section = rf"""
+\clearpage
+{block2}\par\vspace{{1.5mm}}
+\parbox{{\textwidth}}{{\footnotesize \textbf{{Abbildung 3.}} {cap3}\par}}
+"""
 
     return rf"""\documentclass[11pt]{{article}}
 \usepackage[T1]{{fontenc}}
@@ -1132,7 +1250,7 @@ def generate_standalone_onepage(fragment: str, title: str = "Blutdruckdiagramme"
 
 {block1}\par\vspace{{1.5mm}}
 \usebox{{\capBbox}}
-
+{trend_section}
 \end{{document}}
 """
 
@@ -1198,6 +1316,13 @@ def generate_standalone_two_sides(
     block1 = adapt_block(tikz_blocks[0], 1, cap1)
     block2 = adapt_block(tikz_blocks[1], 2, cap2)
 
+    # Optionales Trend-Diagramm (--trend) als dritte zugeschnittene Seite.
+    block3_part = ""
+    if len(tikz_blocks) >= 3:
+        cap3 = fix_caption((captions[2] if len(captions) >= 3 else "").strip())
+        block3 = adapt_block(tikz_blocks[2], 3, cap3)
+        block3_part = "\\vspace{8mm}\n" + block3 + "\n"
+
     return (
         "\\documentclass[tikz,border=3mm]{standalone}\n"
         "\\usepackage[T1]{fontenc}\n"
@@ -1209,6 +1334,7 @@ def generate_standalone_two_sides(
         f"{block1}\n"
         "\\vspace{8mm}\n"
         f"{block2}\n"
+        f"{block3_part}"
         "\\end{document}\n"
     )
 
@@ -1284,6 +1410,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--week-outlier-dia-hi", type=float, default=85.0, help="Upper diastolic threshold for weekly outlier days; default: 85 mmHg (HBPM comparison line).")
     parser.add_argument("--week-outlier-sys-lo", type=float, default=None, help="Optional lower systolic threshold for weekly outlier days; if omitted, only high outliers are marked.")
     parser.add_argument("--week-outlier-dia-lo", type=float, default=None, help="Optional lower diastolic threshold for weekly outlier days; if omitted, only high outliers are marked.")
+    parser.add_argument("--trend", action="store_true",
+                        help="Zusaetzliches Langzeit-Trend-Diagramm (Abbildung 3): alle Tagesmediane als "
+                             "Punkte (keine Blockglaettung) plus zentrierter gleitender Median als "
+                             "Verlaufslinie, mit Monats-Ticks. Gedacht fuer Halbjahres-/Jahresuebersichten, "
+                             "bei denen das Tagesdiagramm zu dicht und laengere Bloecke zu stark "
+                             "glaettend waeren. Standard: aus.")
+    parser.add_argument("--trend-window", type=int, default=7,
+                        help="Kalenderfensterbreite in Tagen fuer den gleitenden Median des "
+                             "Trend-Diagramms (zentriert; ungerade Werte empfohlen). Standard: 7.")
     parser.add_argument("--week-central", choices=["mean", "median"], default="mean", help="Central line of the weekly chart: 'mean' (default; nach Kalendertagen gewichteter Mittelwert der Tagesmittelwerte, an die klinischen HBPM/ESC-Mittelwertschwellen anschlussfähig) or 'median' (Median der Tagesmediane; konsistent zur IQR-Box und robuster gegen Ausreißertage).")
     parser.add_argument("--corridor", default=None, metavar="SYS_LO-SYS_HI/DIA_LO-DIA_HI",
                         help="Zielkorridor als 'sys_lo-sys_hi/dia_lo-dia_hi', z. B. '110-119/70-79' fuer einen aneurysmaspezifisch niedrigeren Korridor. Ohne Angabe bleibt der Standard (ESC-Orientierung 120-129/70-79). Ein abweichender Korridor wird in Legende, Absatz und Bildunterschrift als individuell gewaehlt gekennzeichnet.")
@@ -1304,6 +1439,9 @@ def main() -> int:
     date_to = parse_date(args.date_to) if args.date_to else None
     if date_from is not None and date_to is not None and date_to < date_from:
         raise SystemExit("--date-to must be >= --date-from")
+    if args.trend_window < 1:
+        print("error: --trend-window must be >= 1", file=sys.stderr)
+        return 2
     if args.block_days <= 0:
         raise SystemExit("--block-days must be positive")
 
@@ -1404,6 +1542,8 @@ def main() -> int:
         week_outlier_sys_lo=args.week_outlier_sys_lo,
         week_outlier_dia_lo=args.week_outlier_dia_lo,
         week_central=args.week_central,
+        trend=args.trend,
+        trend_window=args.trend_window,
         **corridor_kwargs,
     )
     args.out.write_text(latex, encoding="utf-8")

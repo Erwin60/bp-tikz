@@ -77,6 +77,16 @@ Im Hauptdokument die jeweils passende PDF referenzieren, z. B.:
 
 Markiert zusätzlich einzelne Tage, deren Tagesmedian eine klinische Schwelle überschreitet (Standard: syst. > 135, diast. > 85 mmHg), als kleine Kreise neben dem IQR-Marker.
 
+## Lange Zeiträume: rotierte Wochenlabels und Trend-Diagramm (`--trend`)
+
+Ab elf 7-Tage-Blöcken (ca. 11 Wochen) rotiert `generate_bp_tikz.py` die Datumslabels des Wochendiagramms automatisch um 45° — damit bleibt es bis zu einem vollen Jahr bei Wochenauflösung lesbar, ohne über `--block-days` stärker glätten zu müssen. Bis zehn Blöcke ändert sich nichts.
+
+Für Halbjahres- und Jahresübersichten, bei denen das Tagesdiagramm zu dicht wird, aber Blockbildung zu viel glätten würde, erzeugt `--trend` zusätzlich ein **Langzeit-Trend-Diagramm** (Abbildung 3, im One-Page-Standalone auf eigener Seite): alle Tagesmediane als ungeglättete Punktwolke plus ein zentrierter gleitender Median als Verlaufslinie (Fensterbreite `--trend-window`, Standard 7 Tage, kalenderbasiert — Messlücken verbreitern das Fenster nicht), mit Monats-Ticks auf der x-Achse:
+
+```bash
+python3 generate_bp_tikz.py --csv iBP_Readings.csv --trend --trend-window 7
+```
+
 ## Individueller Zielkorridor (`--corridor`)
 
 Standardmäßig zeigen beide Diagramme den allgemeinen ESC-orientierten Zielkorridor (120–129 mmHg systolisch, 70–79 mmHg diastolisch). Bei besonderen Indikationen — etwa einem Aortenaneurysma, für das ein niedrigerer Druck angeraten wird — lässt sich ein eigener Korridor angeben:

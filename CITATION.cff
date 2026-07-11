@@ -7,7 +7,9 @@ abstract: >-
   produces a daily course and a block/weekly overview using a two-stage
   aggregation (per calendar day, then fixed-length blocks), with a choice of
   calendar-day-weighted mean or median-of-daily-medians central line and
-  configurable outlier marking. A companion tool (generate_bp_daytime_tikz.py)
+  configurable outlier marking; for long observation periods the weekly labels
+  rotate automatically and an optional long-term trend chart shows unsmoothed
+  daily medians with a rolling-median line. A companion tool (generate_bp_daytime_tikz.py)
   analyzes time-of-day and weekday patterns (Morning/Midday/Evening blocks) with
   median bars, IQR bands, ESC orientation corridors, an hour-of-day measurement
   histogram, and Tukey outlier markers, in color or black-and-white. It also

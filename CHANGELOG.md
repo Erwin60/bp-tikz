@@ -29,8 +29,20 @@ Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
   Strichs die als Kreis markierten Ausreißer sind. Die dynamischen
   y-Achsengrenzen beziehen die Zäune mit ein.
 - Präambel: `\usepackage{booktabs}` für die neuen Tabellen.
+- `generate_bp_tikz.py`: `--trend` (Standard: aus) ergänzt ein
+  **Langzeit-Trend-Diagramm** (Abbildung 3, im One-Page-Standalone auf
+  eigener Seite): alle Tagesmediane als Punkte (keine Blockglättung) plus
+  zentrierter gleitender Median (`--trend-window N`, Standard 7 Tage,
+  kalenderbasiert) als Verlaufslinie, mit Monats-Ticks — für Halbjahres-
+  und Jahresübersichten, bei denen das Tagesdiagramm zu dicht und längere
+  Blöcke zu stark glättend wären.
 
 ### Geändert
+- `generate_bp_tikz.py`: Die Datumslabels des Wochendiagramms werden ab
+  elf Blöcken automatisch um 45° rotiert und verkleinert (vorher
+  überlappten sie ab ca. 11–12 Wochen); bis zehn Blöcke bleibt die Ausgabe
+  byte-identisch. Damit bleibt das Wochendiagramm bis zu einem vollen Jahr
+  (52 Blöcke) bei 7-Tage-Auflösung lesbar.
 - Abstand zwischen Abb. 2a und 2b auf `\\[9mm]` vergrößert; die
   BP-Kennzahlentabelle liegt deshalb (zusammen mit der Puls-Auswertung) auf
   der eigenen Seite „Statistische Kennzahlen", damit die beiden

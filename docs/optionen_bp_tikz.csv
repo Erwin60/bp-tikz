@@ -25,3 +25,5 @@ Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
 --two-sides-out TWO_SIDES_OUT,nein,bp_diagrams_standalone_two_sides.tex,"Erzeugt ein Standalone-Dokument, bei dem jedes Diagramm auf einer eigenen, eng zugeschnittenen Seite steht (Bildunterschrift als Knoten unter der Achse).",--two-sides-out bp_diagrams_standalone_two_sides.tex
 --no-two-sides,nein,"False, Two-Sides-Datei wird erzeugt",Unterdrückt die Erzeugung des Two-Sides-Standalone-Dokuments.,--no-two-sides
 --two-sides-width-cm WIDTH,nein,16.0,Feste Achsenbreite in cm für das Two-Sides-Standalone-Dokument.,--two-sides-width-cm 17.0
+--trend,nein,aus,"Langzeit-Trend-Diagramm (Abb. 3, im One-Page-Standalone auf eigener Seite): alle Tagesmediane als ungeglättete Punkte plus zentrierter gleitender Median als Verlaufslinie, Monats-Ticks. Für Halbjahres-/Jahresübersichten.",--trend
+--trend-window N,nein,7,"Kalenderfensterbreite in Tagen für den gleitenden Median des Trend-Diagramms (zentriert; ungerade Werte empfohlen).",--trend-window 7
