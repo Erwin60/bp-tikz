@@ -3,6 +3,40 @@
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
+## [1.2.8] – 2026-07
+
+### Hinzugefügt
+- `generate_bp_daytime_tikz.py`: Neue Seite **„Statistische Kennzahlen"**
+  (nach `\clearpage`) mit einer Blutdruck-Kennzahlentabelle (immer aktiv):
+  je Zeitraum (Gesamt/Morgen/Mittag/Abend) für systolisch und diastolisch
+  Median, Q1–Q3, Min–Max, n, Anzahl Werte ≥ Vergleichsschwelle (135/85) und
+  Spalte **„im Ziel"** = Anzahl Messungen *innerhalb* des Zielkorridors
+  (konkrete Spanne in einer zweiten Kopfzeile; Erläuterung im
+  Einleitungssatz und in der Fußnote).
+- `--pulse` (Standard: aus): Puls-Auswertung auf der Statistik-Seite –
+  Abb. 3 Puls-Tagesprofil (Median je Tageszeitblock, IQR-Band, punktierte
+  Bradykardie-Schwellenlinie) plus Puls-Kennzahlenbox (Median, Q1–Q3,
+  Min–Max, n, Anzahl < Schwelle) mit Interpretationshinweis und dem Hinweis,
+  dass Blutdrucksenker den Puls senken können. Der Puls wird dazu als
+  5. Tupelelement mit eingelesen (neuer `COL_ALIASES`-Eintrag `pulse`;
+  iBP-Exporte liefern ihn bereits in der kanonischen Spalte `Puls`).
+  Fehlt die Pulsspalte, erscheint ein sachlicher Hinweis statt eines Fehlers.
+- `--pulse-low N` (Standard: 50): Bradykardie-Schwelle in 1/min für die
+  Puls-Auswertung.
+- `--fences` (Standard: aus): zeichnet je Säule in Abb. 2a/2b die **obere**
+  Tukey-Grenze (Q3+1,5·IQR) als kurzen waagrechten Strich (`mark=-`,
+  `mark size=4.5pt`); die Bildunterschrift erklärt, dass Werte oberhalb des
+  Strichs die als Kreis markierten Ausreißer sind. Die dynamischen
+  y-Achsengrenzen beziehen die Zäune mit ein.
+- Präambel: `\usepackage{booktabs}` für die neuen Tabellen.
+
+### Geändert
+- Abstand zwischen Abb. 2a und 2b auf `\\[9mm]` vergrößert; die
+  BP-Kennzahlentabelle liegt deshalb (zusammen mit der Puls-Auswertung) auf
+  der eigenen Seite „Statistische Kennzahlen", damit die beiden
+  vollformatigen Wochentag-Diagramme lesbar groß bleiben und die
+  Statistik-Seite auf eine Seite passt.
+
 ## [1.2.6] – 2026-07
 
 ### Behoben

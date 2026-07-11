@@ -10,12 +10,20 @@ abstract: >-
   configurable outlier marking. A companion tool (generate_bp_daytime_tikz.py)
   analyzes time-of-day and weekday patterns (Morning/Midday/Evening blocks) with
   median bars, IQR bands, ESC orientation corridors, an hour-of-day measurement
-  histogram, and Tukey outlier markers, in color or black-and-white.
+  histogram, and Tukey outlier markers, in color or black-and-white. It also
+  appends a statistics page with a blood-pressure summary table (median, IQR,
+  range, counts at/above comparison thresholds and within the target corridor)
+  and an optional pulse analysis (daily pulse profile with IQR band,
+  configurable bradycardia threshold, and summary table).
 type: software
 authors:
   - family-names: Grabler
     given-names: Erwin
     affiliation: "ARTCOM Vienna, Vienna, Austria"
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21216463
+    description: "Concept DOI (all versions) on Zenodo"
 keywords:
   - blood pressure
   - HBPM
@@ -29,7 +37,9 @@ keywords:
   - reproducibility
   - time of day
   - circadian
+  - pulse
+  - heart rate
 license: MIT
-version: "1.2.3"
-date-released: "2026-06-26"
-repository-code: "https://github.com/USERNAME/bp-tikz"
+version: "1.2.8"
+date-released: "2026-07-11"
+repository-code: "https://github.com/Erwin60/bp-tikz"

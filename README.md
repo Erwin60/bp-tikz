@@ -15,7 +15,7 @@ Die Aggregation ist zweistufig (zuerst Tageskennwerte, dann über die Tage), dam
 
 ### `generate_bp_daytime_tikz.py` – Tageszeit × Wochentag
 
-Ein Diagramm, das die Messungen nach Tageszeit-Blöcken (Morgen/Mittag/Abend) und Wochentag aufschlüsselt; umschaltbar zwischen Farbe und Schwarz-Weiß.
+Ein Diagramm, das die Messungen nach Tageszeit-Blöcken (Morgen/Mittag/Abend) und Wochentag aufschlüsselt; umschaltbar zwischen Farbe und Schwarz-Weiß. Zusätzlich eine eigene Seite **„Statistische Kennzahlen"** mit einer Blutdruck-Kennzahlentabelle sowie optional einer Puls-Auswertung (`--pulse`).
 
 ## Schnellstart
 
@@ -37,7 +37,7 @@ TEXINPUTS=.: pdflatex bp_weekday_daytime.tex
 
 Beide Skripte akzeptieren zwei CSV-Varianten:
 
-Ein **normales, z. B. aus Excel exportiertes** CSV mit getrennten Spalten für Datum, Uhrzeit, systolischen und diastolischen Wert (Spaltennamen werden über Aliase in Deutsch und Englisch erkannt; zusätzliche Spalten wie Puls, Gewicht oder Notizen werden ignoriert).
+Ein **normales, z. B. aus Excel exportiertes** CSV mit getrennten Spalten für Datum, Uhrzeit, systolischen und diastolischen Wert (Spaltennamen werden über Aliase in Deutsch und Englisch erkannt; zusätzliche Spalten wie Gewicht oder Notizen werden ignoriert). Eine Puls-Spalte (`Pulse`/`Puls`/`HR`/…) wird von `generate_bp_daytime_tikz.py` für die optionale Puls-Auswertung (`--pulse`) mit eingelesen.
 
 Das **Export-CSV der iBP-App**. Dieses hat eine Besonderheit: Es legt Datum und Uhrzeit als zwei komma-getrennte Felder in der Date-Spalte ab (z. B. `05.07.26, 20:23`), obwohl die Kopfzeile nur eine Date-Spalte vorsieht. Dadurch hat jede Datenzeile ein Feld mehr als die Kopfzeile, die Uhrzeit rutscht in die Note-Spalte und eine echte Notiz in ein überzähliges Feld. Ohne Behandlung führt das zu falsch zugeordneten oder verlorenen Messungen.
 
@@ -89,6 +89,20 @@ Das Format ist `sys_lo-sys_hi/dia_lo-dia_hi`. Ohne die Option bleibt der ESC-Sta
 
 Hinweis: Der Korridor ist eine Orientierungshilfe für die Darstellung, keine ärztliche Zielwertfestlegung — die konkreten Zielwerte legt die behandelnde Ärztin oder der behandelnde Arzt fest.
 
+## Statistik-Seite und Puls-Auswertung (`--pulse`, `--pulse-low`, `--fences`)
+
+`generate_bp_daytime_tikz.py` hängt an das Dokument eine eigene Seite **„Statistische Kennzahlen"** an. Sie enthält immer eine Blutdruck-Kennzahlentabelle: je Zeitraum (Gesamt/Morgen/Mittag/Abend) für systolisch und diastolisch Median, Interquartilsbereich (Q1–Q3), Spanne (Min–Max), Anzahl der Messungen `n`, Anzahl Werte ab der Vergleichsschwelle (≥ 135/≥ 85 mmHg) sowie die Spalte **„im Ziel"** — die Anzahl der Messungen *innerhalb* des Zielkorridors (nicht die Anzahl der Tage); die konkrete Korridorspanne steht in einer zweiten Kopfzeile.
+
+Mit `--pulse` kommt auf derselben Seite eine **Puls-Auswertung** hinzu: Abb. 3 zeigt das Puls-Tagesprofil (Median je Tageszeitblock mit IQR-Band), eine punktierte Linie markiert die Bradykardie-Schwelle (wählbar über `--pulse-low`, Standard 50/min), darunter eine Kennzahlenbox (Median, Q1–Q3, Min–Max, `n`, Anzahl Werte unter der Schwelle) mit Interpretationshinweis — nützlich zur Beobachtung eines möglichen Pulsabfalls unter Blutdruckmedikation. Fehlt im CSV die Pulsspalte, erscheint ein sachlicher Hinweis; das iBP-Export-CSV liefert den Puls automatisch mit.
+
+```bash
+python3 generate_bp_daytime_tikz.py --csv iBP_Readings.csv --date-from 2026-05-15 \
+  --style bw --name Erwin --corridor 110-119/70-79 --corridor-label Aneurysma \
+  --pulse --pulse-low 48 --fences
+```
+
+Mit `--fences` markiert in Abb. 2a/2b ein kurzer waagrechter Strich über jeder Säule die **obere Tukey-Grenze** (Q3+1,5·IQR): Werte oberhalb dieses Strichs sind die als Kreis markierten Ausreißer nach oben. (Achtung: `--pulse` mit zwei Bindestrichen; `-pulse` ist ein argparse-Fehler.)
+
 ## Alle Optionen
 
 - [`docs/optionen_bp_tikz.csv`](docs/optionen_bp_tikz.csv) – vollständige Optionstabelle für `generate_bp_tikz.py`.
@@ -99,7 +113,7 @@ Beide Skripte zeigen mit `--help` zusätzlich Anwendungsbeispiele.
 ## Anforderungen
 
 - Python 3.8+ (nur Standardbibliothek, keine externen Pakete).
-- LaTeX mit `pgfplots`, `tikz` und `babel`/`ngerman` zum Kompilieren.
+- LaTeX mit `pgfplots`, `tikz`, `booktabs` und `babel`/`ngerman` zum Kompilieren.
 
 ## Änderungshistorie
 

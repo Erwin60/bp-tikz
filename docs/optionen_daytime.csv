@@ -3,9 +3,12 @@ Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
 --style color|bw,nein,color,"Layout des Diagramms: color (Farbe) oder bw (Schwarz-Weiß, Graustufen + Muster).",--style bw
 "--blocks A,B",nein,"10,15","Blockgrenzen in Stunden (Morgen < A, Mittag A..B, Abend > B).","--blocks 10,15"
 --outliers up|both|none,nein,up,"Ausreißer-Darstellung: up nur nach oben (Kreise), both zusätzlich nach unten (Kreuz), none keine.",--outliers both
+--fences,nein,aus,"Zeichnet je Säule in Abb. 2a/2b die obere Tukey-Grenze (Q3+1,5·IQR) als kurzen waagrechten Strich; Werte oberhalb des Strichs sind die als Kreis markierten Ausreißer.",--fences
 --date-from DATE_FROM,nein,"None, alle ab Beginn",Startdatum der Auswertung (inklusive). Messungen davor werden ignoriert.,--date-from 15.05.2026
 --date-to DATE_TO,nein,"None, alle bis Ende",Enddatum der Auswertung (inklusive). Ohne Angabe alle Messungen ab --date-from.,--date-to 20.06.2026
 --name NAME,nein,"None, kein Präfix","Präfix für den Ausgabedateinamen, um z. B. zwei Personen zu unterscheiden (--name Eva -> Eva_bp_weekday_daytime.tex). Ein explizit gesetztes --out hat Vorrang.",--name Eva
+--pulse,nein,aus,"Puls-Auswertung auf der Statistik-Seite: Abb. 3 Puls-Tagesprofil (Median je Block, IQR-Band, Bradykardie-Schwellenlinie) plus Kennzahlenbox. Benötigt eine Puls-/Pulse-Spalte im CSV (iBP liefert sie automatisch).",--pulse
+--pulse-low N,nein,50,"Bradykardie-Schwelle in 1/min für die Puls-Auswertung; Werte darunter werden gezählt und im Profil als punktierte Linie markiert.",--pulse-low 48
 --corridor SYS_LO-SYS_HI/DIA_LO-DIA_HI,nein,None (Standard ESC 120-129/70-79),"Individueller Zielkorridor, z. B. '110-119/70-79'. Ohne Angabe bleibt der ESC-Standard. Ein abweichender Korridor wird im Methodik-Text und als sichtbarer Hinweis in Abb. 1 gekennzeichnet.",--corridor 110-119/70-79
 --corridor-label LABEL,nein,ESC bzw. 'individuell',Kurzbezeichnung des Zielkorridors im Text (z. B. 'Aneurysma').,--corridor-label Aneurysma
 "-o, --out OUT",nein,[name_]bp_weekday_daytime.tex,Ausgabedatei (.tex). Ohne Angabe wird der Standardname (ggf. mit --name-Präfix) verwendet.,--out Eva_daytime.tex
