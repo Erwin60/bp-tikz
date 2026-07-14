@@ -45,7 +45,9 @@ Beide Skripte erkennen das iBP-Format automatisch an seiner Signatur (Spalten �
 
 ## Mehrere Personen unterscheiden – `--name`
 
-Beide Skripte stellen mit `--name` allen Ausgabedateien einen Präfix voran:
+Mit `--name` schreiben beide Skripte ihre Ausgaben in ein **gleichnamiges
+Unterverzeichnis neben dem Skript** und stellen den Namen zusätzlich als Präfix
+voran:
 
 ```bash
 python3 generate_bp_tikz.py        --csv Eva.csv --date-from 15.05.2026 --name Eva
@@ -55,17 +57,33 @@ python3 generate_bp_tikz.py        --csv Adam.csv --date-from 15.05.2026 --name 
 python3 generate_bp_daytime_tikz.py --csv Adam.csv --name Adam
 ```
 
-Ergebnis u. a. `Eva_bp_diagrams.tex`, `Eva_bp_diagrams_both_onepage_standalone.tex`, `Eva_bp_weekday_daytime.tex` und analog `Adam_…`.
+Ergebnis:
 
-Ein explizit gesetzter Pfad (`--out`, bei `generate_bp_tikz.py` auch `--standalone-out` / `--two-sides-out`) hat Vorrang vor dem präfigierten Standardnamen.
+```
+Eva/
+  Eva_bp_diagrams.tex
+  Eva_bp_diagrams_both_onepage_standalone.tex
+  Eva_bp_diagrams_standalone_two_sides.tex
+  Eva_bp_weekday_daytime.tex
+Adam/
+  Adam_…
+```
+
+Das Verzeichnis wird bei Bedarf automatisch angelegt. Es liegt immer neben dem
+Skript – unabhängig davon, aus welchem Verzeichnis der Aufruf erfolgt.
+
+Ohne `--name` bleibt alles wie bisher: Ausgabe ins aktuelle Verzeichnis, ohne
+Präfix. Ein explizit gesetzter Pfad (`--out`, bei `generate_bp_tikz.py` auch
+`--standalone-out` / `--two-sides-out`) hat weiterhin Vorrang.
 
 Im Hauptdokument die jeweils passende PDF referenzieren, z. B.:
 
 ```latex
-\includegraphics{Eva_bp_diagrams_both_onepage_standalone}
+\includegraphics{Eva/Eva_bp_diagrams_both_onepage_standalone}
 ```
 
-`generate_bp_tikz.py` gibt den erwarteten PDF-Namen am Ende seines Laufs aus.
+`generate_bp_tikz.py` gibt den vollständigen Pfad der erzeugten Dateien am Ende
+seines Laufs aus.
 
 ## Wochen-Mittellinie: Mittelwert vs. Median (`--week-central`)
 

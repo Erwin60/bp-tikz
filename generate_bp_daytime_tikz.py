@@ -57,6 +57,7 @@ BLOCK_NAMES = ["Morgen", "Mittag", "Abend"]
 # Datenaufbereitung
 # --------------------------------------------------------------------------
 import re as _re
+from pathlib import Path as _Path
 
 # Spalten-Aliase (Deutsch/Englisch), analog zum bestehenden BP-Skript
 COL_ALIASES = {
@@ -1347,10 +1348,12 @@ def main():
                          "werden ignoriert. Ohne Angabe werden alle Messungen "
                          "ab --date-from verwendet.")
     ap.add_argument("--name", default=None,
-                    help="Optionaler Personen-/Lauf-Name als Praefix fuer den Ausgabedateinamen, "
-                         "um z. B. zwei Personen zu unterscheiden (--name Eva -> "
-                         "Eva_bp_weekday_daytime.tex). Ein explizit gesetztes --out hat Vorrang "
-                         "vor dem praefigierten Standardnamen. Standard: kein Praefix.")
+                    help="Optionaler Personen-/Lauf-Name. Die Ausgabe wird in ein "
+                         "gleichnamiges Unterverzeichnis neben diesem Skript geschrieben "
+                         "und erhaelt den Namen zusaetzlich als Dateipraefix "
+                         "(--name Eva -> Eva/Eva_bp_weekday_daytime.tex). Das Verzeichnis "
+                         "wird bei Bedarf angelegt. Ein explizit gesetztes --out hat Vorrang. "
+                         "Standard: kein Praefix, Ausgabe im aktuellen Verzeichnis.")
     ap.add_argument("--pulse", action="store_true",
                     help="Zusaetzliche Puls-Auswertung auf der Statistik-Seite: Puls-Tagesprofil "
                          "(Abb. 3) und Kennzahlenbox (Median, IQR, Spanne, n, Werte unter "
@@ -1368,14 +1371,23 @@ def main():
                     help="Kurzbezeichnung des Zielkorridors (z. B. 'Aneurysma', 'individuell'). Standard: 'ESC' bzw. 'individuell' bei abweichendem Korridor.")
     args = ap.parse_args()
 
-    # Ausgabedateiname aufloesen: --name als Praefix, sofern --out nicht
-    # explizit gesetzt wurde. Ein explizites --out hat immer Vorrang.
+    # Ausgabedateiname aufloesen: --name erzeugt ein Unterverzeichnis gleichen
+    # Namens neben diesem Skript und dient zugleich als Dateipraefix
+    # (z. B. --name Erwin -> <Skriptordner>/Erwin/Erwin_bp_weekday_daytime.tex).
+    # Das Verzeichnis wird bei Bedarf angelegt. Die Verankerung am Skriptordner
+    # (statt am aktuellen Arbeitsverzeichnis) sorgt dafuer, dass die Dateien
+    # immer neben dem Code landen, egal von wo aufgerufen wird.
+    # Ein explizites --out hat immer Vorrang.
     if args.out is None:
         prefix = (args.name.strip() if args.name else "")
         if prefix:
             prefix = _re.sub(r"[^A-Za-z0-9._-]+", "_", prefix).strip("_")
-        args.out = (f"{prefix}_bp_weekday_daytime.tex" if prefix
-                    else "bp_weekday_daytime.tex")
+        if prefix:
+            outdir = _Path(__file__).resolve().parent / prefix
+            outdir.mkdir(parents=True, exist_ok=True)
+            args.out = str(outdir / f"{prefix}_bp_weekday_daytime.tex")
+        else:
+            args.out = "bp_weekday_daytime.tex"
 
     try:
         a, b = (int(x) for x in args.blocks.split(","))

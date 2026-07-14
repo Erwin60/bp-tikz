@@ -3,6 +3,21 @@
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
+## [1.2.9] – 2026-07
+
+### Geändert
+- `--name` schreibt die Ausgabe jetzt zusätzlich in ein **gleichnamiges
+  Unterverzeichnis** neben dem jeweiligen Skript, statt nur einen Dateipräfix
+  zu setzen (z. B. `--name Erwin` → `Erwin/Erwin_bp_diagrams.tex`,
+  `Erwin/Erwin_bp_weekday_daytime.tex`). Der Ordner wird bei Bedarf angelegt.
+  Er wird am **Skriptverzeichnis** verankert, nicht am aktuellen
+  Arbeitsverzeichnis — die Dateien landen damit verlässlich neben dem Code,
+  unabhängig davon, von wo aus aufgerufen wird. Betrifft
+  `generate_bp_tikz.py` und `generate_bp_daytime_tikz.py`.
+  Ohne `--name` bleibt das Verhalten unverändert (Ausgabe im aktuellen
+  Verzeichnis); ein explizit gesetztes `--out` / `--standalone-out` /
+  `--two-sides-out` hat weiterhin Vorrang.
+
 ## [1.2.8] – 2026-07
 
 ### Hinzugefügt

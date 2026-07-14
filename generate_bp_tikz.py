@@ -1394,7 +1394,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--csv", required=True, type=Path, help="Input CSV file with Date, Systolic and Diastolic columns.")
     parser.add_argument("--date-from", default=None, help="First date to include, e.g. 2026-05-15 or 15.05.2026. Without this option all readings from the earliest measurement are used.")
     parser.add_argument("--date-to", default=None, help="Last date to include. If omitted, all values from date-from onward are used.")
-    parser.add_argument("--name", default=None, help="Optional person/run name used as a filename prefix for all output files (e.g. --name Eva -> Eva_bp_diagrams.tex, Eva_bp_diagrams_both_onepage_standalone.tex, ...). An explicit path option (--out, --standalone-out, ...) always overrides the prefixed default for that file.")
+    parser.add_argument("--name", default=None, help="Optional person/run name. Outputs are written to a sub-directory of that name next to this script and get the name as a filename prefix (e.g. --name Eva -> Eva/Eva_bp_diagrams.tex, Eva/Eva_bp_diagrams_both_onepage_standalone.tex, ...). The directory is created if needed. An explicit path option (--out, --standalone-out, ...) always overrides both for that file.")
     parser.add_argument("--out", type=Path, default=None, help="Output LaTeX fragment path. Default: [name_]bp_diagrams.tex")
     parser.add_argument("--daily-stats", type=Path, default=None, help="Optional daily statistics CSV output.")
     parser.add_argument("--weekly-stats", type=Path, default=None, help="Optional 7-day block statistics CSV output.")
@@ -1447,16 +1447,27 @@ def main() -> int:
 
     # Resolve output file names. A --name prefix is applied to every output
     # whose path was not set explicitly; an explicit --out/--standalone-out/
-    # --two-sides-out always wins. The prefix is a simple filename prefix
-    # ("Eva" -> "Eva_bp_diagrams.tex"), placed in the same directory as
-    # the (otherwise default) base name.
+    # --two-sides-out always wins.
+    #
+    # With --name, outputs additionally go into a per-person sub-directory next
+    # to this script (e.g. --name Erwin -> <script dir>/Erwin/Erwin_bp_diagrams.tex).
+    # The directory is created on demand. Anchoring it to the script location
+    # (not the current working directory) means the files always land beside the
+    # code, no matter where the command is run from.
     prefix = (args.name.strip() if args.name else "")
     # Sanitize: keep it filesystem-friendly.
     if prefix:
         prefix = re.sub(r"[^A-Za-z0-9._-]+", "_", prefix).strip("_")
 
+    outdir: Optional[Path] = None
+    if prefix:
+        outdir = Path(__file__).resolve().parent / prefix
+        outdir.mkdir(parents=True, exist_ok=True)
+
     def with_prefix(base: str) -> Path:
-        return Path(f"{prefix}_{base}" if prefix else base)
+        if not prefix:
+            return Path(base)
+        return outdir / f"{prefix}_{base}"
 
     if args.out is None:
         args.out = with_prefix("bp_diagrams.tex")

@@ -42,6 +42,6 @@ keywords:
   - pulse
   - heart rate
 license: MIT
-version: "1.2.8"
-date-released: "2026-07-11"
+version: "1.2.9"
+date-released: "2026-07-14"
 repository-code: "https://github.com/Erwin60/bp-tikz"

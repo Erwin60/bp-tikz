@@ -1,7 +1,7 @@
 Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
 --csv CSV,ja,"kein Standard, muss angegeben werden","Eingabedatei mit den Blutdruckmessungen. Die CSV muss mindestens Datum, systolischen und diastolischen Blutdruck enthalten.",--csv iBP_Readings.csv
 --date-from DATE_FROM,nein,"None, alle ab frühestem Datum",Startdatum der Auswertung. Ohne Angabe werden alle Messungen ab dem frühesten Datum verwendet (wie beim daytime-Skript).,--date-from 15.05.2026
---name NAME,nein,"None, kein Präfix","Präfix für alle Ausgabedateinamen, um z. B. zwei Personen zu unterscheiden (--name Eva -> Eva_bp_diagrams.tex usw.). Ein explizit gesetzter Pfad (--out, --standalone-out, --two-sides-out) hat Vorrang vor dem präfigierten Standardnamen.",--name Eva
+--name NAME,nein,"None, kein Präfix","Personen-/Lauf-Name. Die Ausgaben werden in ein gleichnamiges Unterverzeichnis neben dem Skript geschrieben und erhalten den Namen zusätzlich als Dateipräfix (--name Eva -> Eva/Eva_bp_diagrams.tex usw.). Das Verzeichnis wird bei Bedarf angelegt und liegt immer neben dem Skript, unabhängig vom Aufrufverzeichnis. Ein explizit gesetzter Pfad (--out, --standalone-out, --two-sides-out) hat Vorrang.",--name Eva
 --date-to DATE_TO,nein,"None, also alle Werte ab --date-from","Enddatum der Auswertung. Wird es weggelassen, werden alle Messungen ab --date-from verwendet.",--date-to 20.06.2026
 --out OUT,nein,bp_diagrams.tex,Name der LaTeX-Fragmentdatei für die Einbindung in ein bestehendes Hauptdokument.,--out bp_diagrams_fragment.tex
 --daily-stats DAILY_STATS,nein,"None, wird nicht erzeugt",Export der berechneten Tagesstatistik als CSV. Sinnvoll zur Kontrolle und für Excel.,--daily-stats bp_diagrams_daily_stats.csv
