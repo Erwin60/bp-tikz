@@ -25,7 +25,7 @@ document (A4) with two figures.
   (2a systolic, 2b diastolic), with **Tukey outlier** markers (circle = high,
   optional `×` = low), the ESC corridor, and the comparison line.
 - **Statistics page (own page):** a blood-pressure summary table per period
-  (Overall/Morning/Midday/Evening), separately for systolic and diastolic —
+  (Overall/Morning/Day/Evening/Night), separately for systolic and diastolic —
   median, Q1–Q3, min–max, number of readings `n`, count at/above the comparison
   threshold (≥ 135/≥ 85) and the **"in target"** column (readings *within* the
   target corridor).
@@ -67,14 +67,17 @@ histogram (Fig. 1b), and the weekday analysis (Fig. 2a/2b), followed by the
 
 ## Time-of-day blocks
 
-Three blocks, controlled by `--blocks "a,b"`:
+Four blocks, controlled by `--blocks "m,d,e,n"`:
 
-- **Morning:** hour `< a`
-- **Midday:** hour `a` to `b` (inclusive)
-- **Evening:** hour `> b`
+- **Morning:** hour `m` to `< d`
+- **Day:** hour `d` to `< e`
+- **Evening:** hour `e` to `< n`
+- **Night:** otherwise (`≥ n` or `< m`) — wraps across midnight
 
-Default: `10,15` (Morning < 10:00, Midday 10:00–15:00, Evening > 15:00). Labels in
-the legend, title, and methodology adapt automatically.
+Default: `6,10,18,22` (Night 22:00–06:00, Morning 06:00–10:00, Day 10:00–18:00,
+Evening 18:00–22:00). Labels in the legend, title, and methodology adapt
+automatically. Night readings thus fall into their own block instead of
+"Morning".
 
 ---
 
@@ -109,7 +112,7 @@ The iBP format, where the time is held in the `Note` column, is handled as well.
 |---|---|---|---|
 | `--csv CSV` | no | `bp.csv` | Input file with the readings. |
 | `--style color\|bw` | no | `color` | Color or black-and-white variant. |
-| `--blocks "a,b"` | no | `10,15` | Boundaries of the three blocks (hours). |
+| `--blocks "m,d,e,n"` | no | `6,10,18,22` | Boundaries of the four blocks (hours; Night wraps across midnight). |
 | `--outliers up\|both\|none` | no | `up` | Tukey outliers: high only / high+low / none. |
 | `--pulse` | no | off | Pulse analysis as its own section at the end of the document (Fig. 3 + summary box). |
 | `--no-hourly` | no | off | Suppress the hourly analysis (24-hour profile Fig. 4 + hourly summary table). |
@@ -119,8 +122,8 @@ The full option list (including `--corridor`, `--corridor-label`, `--pulse-low`,
 `--fences`, `--name`, `--date-from`/`--date-to`) is in
 [`optionen_daytime.csv`](optionen_daytime.csv).
 
-**Black-and-white (`--style bw`):** grayscale + patterns (morning solid, midday
-north-east hatch, evening dots); in the daily profile, systolic solid and
+**Black-and-white (`--style bw`):** grayscale + patterns (morning solid, day
+north-east hatch, evening dots, night crosshatch); in the daily profile, systolic solid and
 diastolic dashed. The ESC corridor is drawn **hatched with a dashed border** so
 it stays distinct from the solidly shaded IQR bands.
 
@@ -154,7 +157,7 @@ python3 generate_bp_daytime_tikz.py --csv bp_raw.csv --style bw \
 
 ```bash
 python3 generate_bp_daytime_tikz.py --csv bp_raw.csv \
-  --blocks 10,16 --outliers both
+  --blocks 5,9,17,21 --outliers both
 ```
 
 ### 4. iBP export (time in the Note column)

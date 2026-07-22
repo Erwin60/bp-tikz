@@ -3,6 +3,32 @@
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
+## [1.3.1] – 2026-07-22
+
+### Geändert
+- `generate_bp_daytime_tikz.py`: Die Tageszeit-Auswertung nutzt jetzt **vier
+  Blöcke** statt drei — **Nacht**, **Morgen**, **Tag**, **Abend** (zuvor
+  Morgen/Mittag/Abend). Damit fallen **Nachtmessungen** in einen eigenen Block
+  statt in „Morgen"; der bisherige Block „Mittag" heißt nun „Tag".
+- Blockgrenzen weiterhin über `--blocks` einstellbar, jetzt mit **vier** Grenzen
+  `m,d,e,n`; neuer Standard **`6,10,18,22`** (Nacht 22:00–06:00 über
+  Mitternacht, Morgen 06:00–10:00, Tag 10:00–18:00, Abend 18:00–22:00). Die
+  Nacht „läuft über Mitternacht" (Stunde `≥ n` **oder** `< m`).
+- Die vier Blöcke sind überall abgebildet: Abb. 1 (Tagesprofil, x-Achse),
+  Abb. 1b (Stunden-Histogramm inkl. Nacht-Einfärbung an **beiden** Tagesrändern
+  und vier Blockgrenzen), Abb. 2a/2b (gruppierte Wochentagsbalken), die
+  Blutdruck- und Puls-Kennzahlentabellen (Zeilen Gesamt/Morgen/Tag/Abend/Nacht)
+  sowie alle Legenden-, Methodik- und Interpretationstexte.
+- Farbschema: Nacht = Violett (Farbe) bzw. Kreuzschraffur (S/W).
+- Beispielbilder (`examples/fig_weekday_daytime_{color,bw}.pdf`) neu erzeugt.
+- Doku aktualisiert (`README.md`, `docs/Manual_Daytime_DE.md`,
+  `docs/Manual_Daytime_EN.md`, `docs/optionen_daytime.csv`).
+
+### Unverändert
+- `generate_bp_tikz.py` (Langzeit-Trend) bleibt bewusst **ohne**
+  Tageszeit-Blöcke; seine „Blöcke" sind die 7-Tage-Wochenblöcke der
+  Trenddarstellung, die keine Uhrzeit speichern.
+
 ## [1.3.0] – 2026-07
 
 ### Hinzugefügt

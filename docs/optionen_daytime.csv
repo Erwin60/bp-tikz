@@ -1,7 +1,7 @@
 Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
 --csv CSV,nein,bp.csv,"Eingabedatei mit den Blutdruckmessungen. Trennzeichen und Dezimalkomma werden automatisch erkannt; benötigt Datum, Uhrzeit sowie systolisch/diastolisch.",--csv iBP_Readings.csv
 --style color|bw,nein,color,"Layout des Diagramms: color (Farbe) oder bw (Schwarz-Weiß, Graustufen + Muster).",--style bw
-"--blocks A,B",nein,"10,15","Blockgrenzen in Stunden (Morgen < A, Mittag A..B, Abend > B).","--blocks 10,15"
+"--blocks M,D,E,N",nein,"6,10,18,22","Blockgrenzen in Stunden: Morgen [M,D), Tag [D,E), Abend [E,N), Nacht sonst (>=N oder <M, ueber Mitternacht).","--blocks 6,10,18,22"
 --outliers up|both|none,nein,up,"Ausreißer-Darstellung: up nur nach oben (Kreise), both zusätzlich nach unten (Kreuz), none keine.",--outliers both
 --fences,nein,aus,"Zeichnet je Säule in Abb. 2a/2b die obere Tukey-Grenze (Q3+1,5·IQR) als kurzen waagrechten Strich; Werte oberhalb des Strichs sind die als Kreis markierten Ausreißer.",--fences
 --no-hourly,nein,"aus (Stundenseite an)","Unterdrückt die stündliche Auswertung. Standardmäßig hängt das Skript eine eigene Seite ""Stündliche Auswertung"" an: das 24-Stunden-Profil (Abb. 4, Median je Stunde 0–23 mit IQR-Whisker) sowie eine Kennzahlentabelle je Stunde (Median, Q1–Q3, Min–Max, n; alle 24 Stunden, leere mit ""–"" markiert), getrennt für systolisch und diastolisch, messungsbezogen über den gewählten Zeitraum.",--no-hourly

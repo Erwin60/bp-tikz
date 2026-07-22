@@ -27,7 +27,7 @@ Abbildungen.
   und Block (2a systolisch, 2b diastolisch), mit **Tukey-Ausreißern** (Kreis =
   nach oben, optional `×` = nach unten), ESC-Korridor und Vergleichslinie.
 - **Statistische Kennzahlen (eigene Seite):** eine Blutdruck-Kennzahlentabelle je
-  Zeitraum (Gesamt/Morgen/Mittag/Abend), für systolisch und diastolisch getrennt —
+  Zeitraum (Gesamt/Morgen/Tag/Abend/Nacht), für systolisch und diastolisch getrennt —
   Median, Q1–Q3, Min–Max, Anzahl der Messungen `n`, Anzahl Werte ab der
   Vergleichsschwelle (≥ 135/≥ 85) und die Spalte **„im Ziel"** (Messungen
   *innerhalb* des Zielkorridors).
@@ -69,14 +69,17 @@ erzeugt; mit `--pulse` käme eine abschließende Seite „Puls-Auswertung" hinzu
 
 ## Tageszeitblöcke
 
-Drei Blöcke, gesteuert über `--blocks "a,b"`:
+Vier Blöcke, gesteuert über `--blocks "m,d,e,n"`:
 
-- **Morgen:** Stunde `< a`
-- **Mittag:** Stunde `a` bis `b` (inklusive)
-- **Abend:** Stunde `> b`
+- **Morgen:** Stunde `m` bis `< d`
+- **Tag:** Stunde `d` bis `< e`
+- **Abend:** Stunde `e` bis `< n`
+- **Nacht:** sonst (`≥ n` oder `< m`) — läuft über Mitternacht
 
-Standard: `10,15` (Morgen < 10:00, Mittag 10:00–15:00, Abend > 15:00). Die
-Beschriftungen in Legende, Titel und Methodik passen sich automatisch an.
+Standard: `6,10,18,22` (Nacht 22:00–06:00, Morgen 06:00–10:00, Tag 10:00–18:00,
+Abend 18:00–22:00). Die Beschriftungen in Legende, Titel und Methodik passen
+sich automatisch an. Nachtmessungen fallen dadurch in einen eigenen Block statt
+in „Morgen".
 
 ---
 
@@ -112,7 +115,7 @@ verarbeitet.
 |---|---|---|---|
 | `--csv CSV` | nein | `bp.csv` | Eingabedatei mit den Messungen. |
 | `--style color\|bw` | nein | `color` | Farb- oder Schwarz-Weiß-Variante. |
-| `--blocks "a,b"` | nein | `10,15` | Grenzen der drei Tageszeitblöcke (Stunden). |
+| `--blocks "m,d,e,n"` | nein | `6,10,18,22` | Grenzen der vier Tageszeitblöcke (Stunden; Nacht läuft über Mitternacht). |
 | `--outliers up\|both\|none` | nein | `up` | Tukey-Ausreißer: nur oben / oben+unten / keine. |
 | `--pulse` | nein | aus | Puls-Auswertung als eigener Abschnitt am Dokumentende (Abb. 3 + Kennzahlenbox). |
 | `--no-hourly` | nein | aus | Unterdrückt die stündliche Auswertung (24-Stunden-Profil Abb. 4 + Kennzahlentabelle je Stunde). |
@@ -122,8 +125,8 @@ Die vollständige Optionsliste (u. a. `--corridor`, `--corridor-label`,
 `--pulse-low`, `--fences`, `--name`, `--date-from`/`--date-to`) steht in
 [`optionen_daytime.csv`](optionen_daytime.csv).
 
-**Schwarz-Weiß (`--style bw`):** Graustufen + Muster (Morgen solide, Mittag
-nordost-schraffiert, Abend punktiert); im Tagesprofil systolisch durchgezogen,
+**Schwarz-Weiß (`--style bw`):** Graustufen + Muster (Morgen solide, Tag
+nordost-schraffiert, Abend punktiert, Nacht kreuzschraffiert); im Tagesprofil systolisch durchgezogen,
 diastolisch gestrichelt. Der ESC-Korridor ist **schraffiert mit gestricheltem
 Rand** dargestellt, damit er sich klar von den flächig grauen IQR-Bändern
 abhebt.
@@ -158,7 +161,7 @@ python3 generate_bp_daytime_tikz.py --csv bp_raw.csv --style bw \
 
 ```bash
 python3 generate_bp_daytime_tikz.py --csv bp_raw.csv \
-  --blocks 10,16 --outliers both
+  --blocks 5,9,17,21 --outliers both
 ```
 
 ### 4. iBP-Export (Uhrzeit in der Note-Spalte)

@@ -15,7 +15,7 @@ Die Aggregation ist zweistufig (zuerst Tageskennwerte, dann über die Tage), dam
 
 ### `generate_bp_daytime_tikz.py` – Tageszeit × Wochentag
 
-Ein Diagramm, das die Messungen nach Tageszeit-Blöcken (Morgen/Mittag/Abend) und Wochentag aufschlüsselt; umschaltbar zwischen Farbe und Schwarz-Weiß. Dazu eine eigene Seite **„Statistische Kennzahlen"** mit einer Blutdruck-Kennzahlentabelle und eine Seite **„Stündliche Auswertung"** mit einem 24-Stunden-Profil (Median je Stunde mit IQR-Whisker) samt Kennzahlentabelle je Stunde 0–23. Optional als letzte Seite eine Puls-Auswertung (`--pulse`).
+Ein Diagramm, das die Messungen nach Tageszeit-Blöcken (Nacht/Morgen/Tag/Abend) und Wochentag aufschlüsselt; umschaltbar zwischen Farbe und Schwarz-Weiß. Dazu eine eigene Seite **„Statistische Kennzahlen"** mit einer Blutdruck-Kennzahlentabelle und eine Seite **„Stündliche Auswertung"** mit einem 24-Stunden-Profil (Median je Stunde mit IQR-Whisker) samt Kennzahlentabelle je Stunde 0–23. Optional als letzte Seite eine Puls-Auswertung (`--pulse`).
 
 ## Schnellstart
 
@@ -121,7 +121,7 @@ Hinweis: Der Korridor ist eine Orientierungshilfe für die Darstellung, keine ä
 
 ## Statistik-Seite, Stündliche Auswertung und Puls (`--pulse`, `--pulse-low`, `--fences`, `--no-hourly`)
 
-`generate_bp_daytime_tikz.py` hängt an das Dokument eine eigene Seite **„Statistische Kennzahlen"** an. Sie enthält immer eine Blutdruck-Kennzahlentabelle: je Zeitraum (Gesamt/Morgen/Mittag/Abend) für systolisch und diastolisch Median, Interquartilsbereich (Q1–Q3), Spanne (Min–Max), Anzahl der Messungen `n`, Anzahl Werte ab der Vergleichsschwelle (≥ 135/≥ 85 mmHg) sowie die Spalte **„im Ziel"** — die Anzahl der Messungen *innerhalb* des Zielkorridors (nicht die Anzahl der Tage); die konkrete Korridorspanne steht in einer zweiten Kopfzeile.
+`generate_bp_daytime_tikz.py` hängt an das Dokument eine eigene Seite **„Statistische Kennzahlen"** an. Sie enthält immer eine Blutdruck-Kennzahlentabelle: je Zeitraum (Gesamt/Morgen/Tag/Abend/Nacht) für systolisch und diastolisch Median, Interquartilsbereich (Q1–Q3), Spanne (Min–Max), Anzahl der Messungen `n`, Anzahl Werte ab der Vergleichsschwelle (≥ 135/≥ 85 mmHg) sowie die Spalte **„im Ziel"** — die Anzahl der Messungen *innerhalb* des Zielkorridors (nicht die Anzahl der Tage); die konkrete Korridorspanne steht in einer zweiten Kopfzeile.
 
 Danach folgt eine Seite **„Stündliche Auswertung"** mit einem **24-Stunden-Profil** (Abb. 4): je voller Tagesstunde 0–23 der Median als Marker mit IQR-Whisker (Q1–Q3), systolisch und diastolisch getrennt. Leere Stunden bleiben als Lücke sichtbar; eine dünne Linie verbindet nur unmittelbar aufeinanderfolgende Stunden (keine Interpolation über messfreie Stunden). Darunter eine Kennzahlentabelle über **alle 24 Stunden** (Median, Q1–Q3, Min–Max, `n`; Stunden ohne Messung mit „–"), messungsbezogen über den gewählten Zeitraum. Mit `--no-hourly` lässt sich diese Seite abschalten.
 

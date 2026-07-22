@@ -10,7 +10,7 @@ abstract: >-
   configurable outlier marking; for long observation periods the weekly labels
   rotate automatically and an optional long-term trend chart shows unsmoothed
   daily medians with a rolling-median line. A companion tool (generate_bp_daytime_tikz.py)
-  analyzes time-of-day and weekday patterns (Morning/Midday/Evening blocks) with
+  analyzes time-of-day and weekday patterns (Night/Morning/Day/Evening blocks) with
   median bars, IQR bands, ESC orientation corridors, an hour-of-day measurement
   histogram, and Tukey outlier markers, in color or black-and-white. It also
   appends a statistics page with a blood-pressure summary table (median, IQR,
@@ -44,6 +44,6 @@ keywords:
   - pulse
   - heart rate
 license: MIT
-version: "1.3.0"
+version: "1.3.1"
 date-released: "2026-07-22"
 repository-code: "https://github.com/Erwin60/bp-tikz"
