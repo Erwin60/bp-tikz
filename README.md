@@ -15,7 +15,7 @@ Die Aggregation ist zweistufig (zuerst Tageskennwerte, dann über die Tage), dam
 
 ### `generate_bp_daytime_tikz.py` – Tageszeit × Wochentag
 
-Ein Diagramm, das die Messungen nach Tageszeit-Blöcken (Morgen/Mittag/Abend) und Wochentag aufschlüsselt; umschaltbar zwischen Farbe und Schwarz-Weiß. Zusätzlich eine eigene Seite **„Statistische Kennzahlen"** mit einer Blutdruck-Kennzahlentabelle sowie optional einer Puls-Auswertung (`--pulse`).
+Ein Diagramm, das die Messungen nach Tageszeit-Blöcken (Morgen/Mittag/Abend) und Wochentag aufschlüsselt; umschaltbar zwischen Farbe und Schwarz-Weiß. Dazu eine eigene Seite **„Statistische Kennzahlen"** mit einer Blutdruck-Kennzahlentabelle und eine Seite **„Stündliche Auswertung"** mit einem 24-Stunden-Profil (Median je Stunde mit IQR-Whisker) samt Kennzahlentabelle je Stunde 0–23. Optional als letzte Seite eine Puls-Auswertung (`--pulse`).
 
 ## Schnellstart
 
@@ -105,6 +105,8 @@ Für Halbjahres- und Jahresübersichten, bei denen das Tagesdiagramm zu dicht wi
 python3 generate_bp_tikz.py --csv iBP_Readings.csv --trend --trend-window 7
 ```
 
+Die Randbehandlung der Verlaufslinie steuert `--trend-edge-policy` (Standard `symmetric`): Die Linie beginnt bzw. endet erst dort, wo das zentrierte Fenster **beidseitig** vollständig gefüllt ist — das vermeidet den Randartefakt, dass die Linie am ersten/letzten Tag durch das einseitig verkürzte Fenster neben der Punktwolke startet. `both` blendet nur echte Einzel-Randtage aus, `full` zeichnet wie früher über alle Tage; die Tagesmedian-Punkte bleiben in allen Fällen vollständig.
+
 ## Individueller Zielkorridor (`--corridor`)
 
 Standardmäßig zeigen beide Diagramme den allgemeinen ESC-orientierten Zielkorridor (120–129 mmHg systolisch, 70–79 mmHg diastolisch). Bei besonderen Indikationen — etwa einem Aortenaneurysma, für das ein niedrigerer Druck angeraten wird — lässt sich ein eigener Korridor angeben:
@@ -117,11 +119,13 @@ Das Format ist `sys_lo-sys_hi/dia_lo-dia_hi`. Ohne die Option bleibt der ESC-Sta
 
 Hinweis: Der Korridor ist eine Orientierungshilfe für die Darstellung, keine ärztliche Zielwertfestlegung — die konkreten Zielwerte legt die behandelnde Ärztin oder der behandelnde Arzt fest.
 
-## Statistik-Seite und Puls-Auswertung (`--pulse`, `--pulse-low`, `--fences`)
+## Statistik-Seite, Stündliche Auswertung und Puls (`--pulse`, `--pulse-low`, `--fences`, `--no-hourly`)
 
 `generate_bp_daytime_tikz.py` hängt an das Dokument eine eigene Seite **„Statistische Kennzahlen"** an. Sie enthält immer eine Blutdruck-Kennzahlentabelle: je Zeitraum (Gesamt/Morgen/Mittag/Abend) für systolisch und diastolisch Median, Interquartilsbereich (Q1–Q3), Spanne (Min–Max), Anzahl der Messungen `n`, Anzahl Werte ab der Vergleichsschwelle (≥ 135/≥ 85 mmHg) sowie die Spalte **„im Ziel"** — die Anzahl der Messungen *innerhalb* des Zielkorridors (nicht die Anzahl der Tage); die konkrete Korridorspanne steht in einer zweiten Kopfzeile.
 
-Mit `--pulse` kommt auf derselben Seite eine **Puls-Auswertung** hinzu: Abb. 3 zeigt das Puls-Tagesprofil (Median je Tageszeitblock mit IQR-Band), eine punktierte Linie markiert die Bradykardie-Schwelle (wählbar über `--pulse-low`, Standard 50/min), darunter eine Kennzahlenbox (Median, Q1–Q3, Min–Max, `n`, Anzahl Werte unter der Schwelle) mit Interpretationshinweis — nützlich zur Beobachtung eines möglichen Pulsabfalls unter Blutdruckmedikation. Fehlt im CSV die Pulsspalte, erscheint ein sachlicher Hinweis; das iBP-Export-CSV liefert den Puls automatisch mit.
+Danach folgt eine Seite **„Stündliche Auswertung"** mit einem **24-Stunden-Profil** (Abb. 4): je voller Tagesstunde 0–23 der Median als Marker mit IQR-Whisker (Q1–Q3), systolisch und diastolisch getrennt. Leere Stunden bleiben als Lücke sichtbar; eine dünne Linie verbindet nur unmittelbar aufeinanderfolgende Stunden (keine Interpolation über messfreie Stunden). Darunter eine Kennzahlentabelle über **alle 24 Stunden** (Median, Q1–Q3, Min–Max, `n`; Stunden ohne Messung mit „–"), messungsbezogen über den gewählten Zeitraum. Mit `--no-hourly` lässt sich diese Seite abschalten.
+
+Mit `--pulse` kommt als **letzte Seite** eine eigene **Puls-Auswertung** hinzu: Abb. 3 zeigt das Puls-Tagesprofil (Median je Tageszeitblock mit IQR-Band), eine punktierte Linie markiert die Bradykardie-Schwelle (wählbar über `--pulse-low`, Standard 50/min), darunter eine Kennzahlenbox (Median, Q1–Q3, Min–Max, `n`, Anzahl Werte unter der Schwelle) mit Interpretationshinweis — nützlich zur Beobachtung eines möglichen Pulsabfalls unter Blutdruckmedikation. Fehlt im CSV die Pulsspalte, erscheint ein sachlicher Hinweis; das iBP-Export-CSV liefert den Puls automatisch mit.
 
 ```bash
 python3 generate_bp_daytime_tikz.py --csv iBP_Readings.csv --date-from 2026-05-15 \

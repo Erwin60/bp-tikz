@@ -48,6 +48,7 @@ import datetime as _dt
 import math
 import statistics
 import sys
+from decimal import Decimal, ROUND_HALF_UP
 
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 BLOCK_NAMES = ["Morgen", "Mittag", "Abend"]
@@ -378,6 +379,19 @@ def read_rows(path):
     return rows
 
 
+def round_half_up(value):
+    """Kaufmaennische Rundung auf ganze Zahlen fuer die Anzeige.
+
+    Pythons format(".0f") verwendet Banker's Rounding und wuerde z. B. 126.5
+    auf 126 abrunden. Fuer die Kennzahlentabellen ist die kaufmaennische
+    Rundung (126.5 -> 127) erwartungskonform. Die Rundung betrifft nur die
+    Darstellung; alle Berechnungen und Diagrammkoordinaten arbeiten
+    unveraendert mit den exakten Gleitkommawerten.
+    """
+    return int(Decimal(repr(float(value))).quantize(Decimal("1"),
+                                                    rounding=ROUND_HALF_UP))
+
+
 def quantile(vals, p):
     """Lineares Quantil (Typ 7), wie in der bisherigen Auswertung."""
     vals = sorted(vals)
@@ -596,7 +610,8 @@ def style_defs(style):
 # LaTeX-Erzeugung
 # --------------------------------------------------------------------------
 def fmt(med):
-    return f"{med:.0f}"
+    """Anzeigeformat fuer Mediane im Fliesstext (kaufmaennisch gerundet)."""
+    return f"{round_half_up(med)}"
 
 
 def build_profile_plot(sys_p, dia_p, st):
@@ -739,8 +754,10 @@ def build_pulse_box(ps, low_thr, date_range, n_days):
     def fmt_cell(s):
         if s is None:
             return "-- & -- & -- & -- & --"
-        return (f"{s['med']:.0f} & {s['q1']:.0f}--{s['q3']:.0f} & "
-                f"{s['min']:.0f}--{s['max']:.0f} & {s['n']} & {s['n_low']}")
+        return (f"{round_half_up(s['med'])} & "
+                f"{round_half_up(s['q1'])}--{round_half_up(s['q3'])} & "
+                f"{round_half_up(s['min'])}--{round_half_up(s['max'])} & "
+                f"{s['n']} & {s['n_low']}")
     rows_tex = []
     for label, key in [("Gesamt", "overall"), ("Morgen", "Morgen"),
                        ("Mittag", "Mittag"), ("Abend", "Abend")]:
@@ -754,7 +771,7 @@ def build_pulse_box(ps, low_thr, date_range, n_days):
         low_note = (rf" Davon liegen {n_low_total} Messung(en) unter "
                     rf"{low_thr:g}/min (Bradykardie-Schwelle).")
     # Median-Puls fuer den Datenkommentar
-    med_txt = f"{ov['med']:.0f}" if ov else "--"
+    med_txt = f"{round_half_up(ov['med'])}" if ov else "--"
     return rf"""\vspace{{2mm}}
 \begin{{center}}
 {{\footnotesize\textbf{{Puls-Kennzahlen (1/min).}} Median, Interquartilsbereich (Q1--Q3), Spanne (Min--Max), Anzahl der Messungen \texttt{{n}} und Anzahl Werte unterhalb der Schwelle {low_thr:g}/min ($<${low_thr:g}).}}\\[1.5mm]
@@ -789,8 +806,10 @@ def build_bp_box(sps, dps, sys_thr, dia_thr, corridor_sys, corridor_dia,
         if s is None:
             return "-- & -- & -- & -- & -- & --"
         n_in = s['n_in'] if s['n_in'] is not None else "--"
-        return (f"{s['med']:.0f} & {s['q1']:.0f}--{s['q3']:.0f} & "
-                f"{s['min']:.0f}--{s['max']:.0f} & {s['n']} & {s['n_hi']} & {n_in}")
+        return (f"{round_half_up(s['med'])} & "
+                f"{round_half_up(s['q1'])}--{round_half_up(s['q3'])} & "
+                f"{round_half_up(s['min'])}--{round_half_up(s['max'])} & "
+                f"{s['n']} & {s['n_hi']} & {n_in}")
     rows_tex = []
     for label, key in [("Gesamt", "overall"), ("Morgen", "Morgen"),
                        ("Mittag", "Mittag"), ("Abend", "Abend")]:
@@ -812,7 +831,7 @@ def build_bp_box(sps, dps, sys_thr, dia_thr, corridor_sys, corridor_dia,
 \end{{tabular}}}}
 \end{{center}}
 
-\noindent{{\scriptsize In der Spalte \texttt{{n}} steht die Anzahl der Messungen im jeweiligen Zeitraum (Gesamt bzw.\ Tageszeitblock), nicht die Anzahl der Tage. Die Spalten $\geq${sys_thr:g}/$\geq${dia_thr:g} z\"ahlen Messungen \emph{{ab}} der h\"auslichen Vergleichsschwelle; ,,im Ziel`` z\"ahlt Messungen, die \emph{{innerhalb}} des angestrebten Zielkorridors ({corridor_label}: {cs_lo}--{cs_hi}\,mmHg systolisch bzw.\ {cd_lo}--{cd_hi}\,mmHg diastolisch) liegen -- also die Zahl der Messungen, die den Zielbereich treffen. Diese Statistik ersetzt keine \"arztliche Beurteilung.}}
+\noindent{{\scriptsize \textbf{{Bezugsebene der Kennzahlen.}} Alle Werte dieser Tabelle sind \emph{{messungsbezogen}}: Median, Quartile und Spannweite werden \"uber die einzelnen Messwerte des jeweiligen Zeitraums gebildet, ohne vorherige Zusammenfassung nach Kalendertagen. Tage mit vielen Messungen gehen daher st\"arker in die Kennzahlen ein als Tage mit wenigen Messungen. Die Verlaufsdiagramme der Langzeitauswertung sind demgegen\"uber \emph{{tagesgewichtet}}: dort wird zun\"achst ein Median je Kalendertag gebildet und anschlie\ss{{}}end der Median \"uber diese Tageswerte, damit jeder Tag unabh\"angig von der Messanzahl gleich z\"ahlt. Beide Bezugsebenen sind statistisch korrekt; sie k\"onnen -- je nach Verteilung der Messzeitpunkte \"uber die Tage -- um wenige mmHg voneinander abweichen. In der Spalte \texttt{{n}} steht die Anzahl der Messungen im jeweiligen Zeitraum (Gesamt bzw.\ Tageszeitblock), nicht die Anzahl der Tage. Die Spalten $\geq${sys_thr:g}/$\geq${dia_thr:g} z\"ahlen Messungen \emph{{ab}} der h\"auslichen Vergleichsschwelle; ,,im Ziel`` z\"ahlt Messungen, die \emph{{innerhalb}} des angestrebten Zielkorridors ({corridor_label}: {cs_lo}--{cs_hi}\,mmHg systolisch bzw.\ {cd_lo}--{cd_hi}\,mmHg diastolisch) liegen -- also die Zahl der Messungen, die den Zielbereich treffen. Diese Statistik ersetzt keine \"arztliche Beurteilung.}}
 """
 
 
@@ -890,6 +909,198 @@ def build_hour_histogram(rows, st, morning_end, midday_end):
 {series_tex}
 \end{{axis}}
 \end{{tikzpicture}}"""
+
+
+def agg_hour_stats(rows, idx):
+    """Kennzahlen je Stunde (0--23) ueber den gesamten Auswertungszeitraum.
+
+    Fuer jede der 24 Tagesstunden werden Median, Q1, Q3, Min, Max und die
+    Anzahl der Messungen n aus allen Messwerten dieser Stunde gebildet --
+    messungsbezogen, ohne vorherige Zusammenfassung nach Kalendertagen und
+    damit konsistent zur Block-Kennzahlentabelle. Stunden ohne Messung
+    liefern None.
+
+    idx : 2 = systolisch, 3 = diastolisch (Tupelposition wie in read_rows()).
+    Rueckgabe: dict hour -> {"med","q1","q3","min","max","n"} | None.
+    """
+    out = {}
+    for h in range(24):
+        v = [r[idx] for r in rows if r[1] == h]
+        if v:
+            out[h] = {
+                "med": statistics.median(v),
+                "q1": quantile(v, .25),
+                "q3": quantile(v, .75),
+                "min": min(v),
+                "max": max(v),
+                "n": len(v),
+            }
+        else:
+            out[h] = None
+    return out
+
+
+def _hour_runs(prof):
+    """Zusammenhaengende Laeufe belegter Stunden (fuer die Verbindungslinien).
+
+    Gibt eine Liste von Stundenlisten zurueck, wobei nur unmittelbar
+    aufeinanderfolgende belegte Stunden (h, h+1, ...) zu einem Lauf gehoeren.
+    So verbindet im Diagramm keine Linie ueber eine messfreie (Nacht-)Luecke
+    hinweg -- es wird also nicht ueber fehlende Stunden interpoliert.
+    """
+    hrs = [h for h in range(24) if prof[h]]
+    runs, cur = [], []
+    for h in hrs:
+        if cur and h == cur[-1] + 1:
+            cur.append(h)
+        else:
+            if len(cur) >= 2:
+                runs.append(cur)
+            cur = [h]
+    if len(cur) >= 2:
+        runs.append(cur)
+    return runs
+
+
+def build_hour_profile_plot(sys_h, dia_h, st):
+    """Abbildung 4: 24-Stunden-Profil.
+
+    Je Tagesstunde 0--23 wird der Median als Marker mit einem IQR-Whisker
+    (Q1--Q3) fuer systolisch und diastolisch gezeichnet. Leere Stunden bleiben
+    als Luecke sichtbar; innerhalb zusammenhaengender Stundenlaeufe verbindet
+    eine duenne Linie die Mediane, ohne ueber messfreie Stunden zu
+    interpolieren. Zielkorridor und Vergleichsschwellen (135/85) werden -- wie
+    in Abbildung 1 -- als Hintergrund bzw. punktierte Linien hinterlegt.
+    """
+    cs, cd = st['corridor_sys'], st['corridor_dia']
+    sys_line, dia_line = st['line_sys'], st['line_dia']
+
+    def err_coords(prof):
+        pts = []
+        for h in range(24):
+            s = prof[h]
+            if not s:
+                continue
+            up = s['q3'] - s['med']
+            dn = s['med'] - s['q1']
+            pts.append(f"({h},{s['med']:.0f}) += (0,{up:.1f}) -= (0,{dn:.1f})")
+        return "\n".join(pts)
+
+    def seg_lines(prof, style):
+        segs = []
+        for run in _hour_runs(prof):
+            coords = " ".join(f"({h},{prof[h]['med']:.0f})" for h in run)
+            segs.append(rf"\addplot[{style},thin,no marks,forget plot] "
+                        rf"coordinates {{{coords}}};")
+        return "\n".join(segs)
+
+    # Datenabhaengige y-Grenzen: Whisker-Enden (Q1/Q3) beider Messgroessen,
+    # Korridor und Vergleichsschwellen einbeziehen, dann etwas Luft ergaenzen.
+    lows, highs = [], []
+    for prof in (sys_h, dia_h):
+        for s in prof.values():
+            if s:
+                lows.append(s['q1'])
+                highs.append(s['q3'])
+    lows += [cd[0], 85]
+    highs += [cs[1], 135]
+    ymin = int((min(lows) - 6) // 2 * 2) if lows else 60
+    ymax = int(((max(highs) + 6) + 1) // 2 * 2) if highs else 150
+
+    sys_seg = seg_lines(sys_h, sys_line)
+    dia_seg = seg_lines(dia_h, dia_line)
+    sys_err = err_coords(sys_h)
+    dia_err = err_coords(dia_h)
+
+    # Sichtbarer Hinweis, wenn ein individueller (z. B. aneurysmaspezifischer)
+    # Korridor verwendet wird -- analog zu Abbildung 1.
+    if st.get("corridor_is_custom"):
+        cs_lo, cs_hi = f"{cs[0]:g}", f"{cs[1]:g}"
+        cd_lo, cd_hi = f"{cd[0]:g}", f"{cd[1]:g}"
+        corridor_annotation = (
+            rf"\node[anchor=north east,font=\scriptsize\bfseries,fill=white,"
+            rf"fill opacity=0.75,text opacity=1,inner sep=1.5pt] "
+            rf"at ([yshift=1pt]rel axis cs:0.99,1.0) "
+            rf"{{Individueller Zielkorridor {cs_lo}--{cs_hi}/{cd_lo}--{cd_hi}\,mmHg}};"
+        )
+    else:
+        corridor_annotation = ""
+
+    return rf"""\begin{{tikzpicture}}
+\begin{{axis}}[
+    width=0.92\textwidth, height=6.2cm,
+    xmin=-0.5, xmax=23.5, ymin={ymin}, ymax={ymax},
+    xtick={{0,2,4,6,8,10,12,14,16,18,20,22}},
+    xticklabel style={{font=\scriptsize}},
+    yticklabel style={{font=\scriptsize}},
+    xlabel={{\footnotesize Uhrzeit [h]}},
+    ylabel={{Blutdruck [mmHg]}},
+    ymajorgrids=true, grid style={{gray!25}},
+    title={{\footnotesize\bfseries Abb.~4: 24-Stunden-Profil (Median je Stunde, Whisker\,=\,IQR)}},
+    legend style={{at={{(0.5,-0.20)}},anchor=north,legend columns=2,font=\scriptsize,draw=gray!50}},
+    legend image post style={{scale=1.3}},
+]
+\fill[{st['corridor_fill']}] (axis cs:-0.5,{cs[0]}) rectangle (axis cs:23.5,{cs[1]});
+\fill[{st['corridor_fill']}] (axis cs:-0.5,{cd[0]}) rectangle (axis cs:23.5,{cd[1]});
+{sys_seg}
+{dia_seg}
+\addplot[{sys_line},only marks,error bars/.cd,y dir=both,y explicit,error bar style={{line width=0.5pt}}] coordinates {{
+{sys_err}
+}};
+\addlegendentry{{Systolisch (Median, Whisker\,=\,IQR)}}
+\addplot[{dia_line},only marks,error bars/.cd,y dir=both,y explicit,error bar style={{line width=0.5pt}}] coordinates {{
+{dia_err}
+}};
+\addlegendentry{{Diastolisch (Median, Whisker\,=\,IQR)}}
+\draw[densely dotted,thick,{st['thresh']}] (axis cs:-0.5,135) -- (axis cs:23.5,135)
+   node[pos=0.96,above,font=\tiny,{st['thresh']}]{{135 syst.}};
+\draw[densely dotted,thick,{st['thresh']}] (axis cs:-0.5,85) -- (axis cs:23.5,85)
+   node[pos=0.96,above,font=\tiny,{st['thresh']}]{{85 diast.}};
+{corridor_annotation}
+\end{{axis}}
+\end{{tikzpicture}}"""
+
+
+def build_hour_bp_box(sys_h, dia_h, date_range, n_days):
+    """Kennzahlentabelle je Tagesstunde 0--23 (systolisch + diastolisch).
+
+    Aufbau wie build_bp_box, jedoch zeilenweise je voller Stunde. Es werden
+    alle 24 Tagesstunden aufgefuehrt; Stunden ohne Messung erhalten in allen
+    Zellen den Strich ,,--``. Alle Kennzahlen sind messungsbezogen (ohne
+    Tagesgewichtung).
+    """
+    def cell(s):
+        if s is None:
+            return "-- & -- & -- & --"
+        return (f"{round_half_up(s['med'])} & "
+                f"{round_half_up(s['q1'])}--{round_half_up(s['q3'])} & "
+                f"{round_half_up(s['min'])}--{round_half_up(s['max'])} & "
+                f"{s['n']}")
+    rows_tex = []
+    n_hours = 0
+    n_meas = 0
+    for h in range(24):
+        if sys_h[h] is not None:
+            n_hours += 1
+            n_meas += sys_h[h]['n']
+        rows_tex.append(rf"{h:02d}:00 & {cell(sys_h[h])} & {cell(dia_h[h])} \\")
+    body = "\n".join(rows_tex)
+    return rf"""\begin{{center}}
+{{\scriptsize\textbf{{Blutdruck-Kennzahlen je Stunde (mmHg).}} Je voller Tagesstunde (Bin h:00--h:59) Median, Interquartilsbereich (Q1--Q3), Spanne (Min--Max) und Anzahl der Messungen \texttt{{n}}, getrennt fuer systolisch und diastolisch. Aufgef\"uhrt sind alle 24 Tagesstunden; Stunden ohne Messung sind in allen Zellen mit ,,--`` markiert.}}\\[1mm]
+{{\scriptsize\renewcommand{{\arraystretch}}{{0.9}}
+\begin{{tabular}}{{@{{}}l r r r r r r r r@{{}}}}
+\toprule
+ & \multicolumn{{4}}{{c}}{{\textbf{{Systolisch}}}} & \multicolumn{{4}}{{c}}{{\textbf{{Diastolisch}}}} \\
+\cmidrule(lr){{2-5}}\cmidrule(lr){{6-9}}
+\textbf{{Stunde}} & \textbf{{Med.}} & \textbf{{Q1--Q3}} & \textbf{{Min--Max}} & \textbf{{n}} & \textbf{{Med.}} & \textbf{{Q1--Q3}} & \textbf{{Min--Max}} & \textbf{{n}} \\
+\midrule
+{body}
+\bottomrule
+\end{{tabular}}}}
+\end{{center}}
+
+\noindent{{\scriptsize \textbf{{Bezugsebene und Lesehilfe.}} Grundlage: {n_meas} Messungen an {n_days} Tagen im Zeitraum {date_range}; Messwerte lagen an {n_hours} der 24 Tagesstunden vor. Alle Werte sind \emph{{messungsbezogen}} (Median, Quartile und Spannweite je Stunde \"uber die Einzelmesswerte, ohne vorherige Zusammenfassung nach Kalendertagen) und damit konsistent zur Block-Kennzahlentabelle. Einzelne Stunden sind bei h\"auslicher Messung oft nur d\"unn besetzt (h\"aufig \texttt{{n}}=1--2); bei \texttt{{n}}=1 fallen Median, Q1--Q3 und Min--Max auf denselben Einzelwert zusammen. Die Stunden-Kennzahlen zeigen die feinere Tageskinetik; f\"ur robuste Aussagen bleiben die Tageszeitbl\"ocke (Morgen/Mittag/Abend) ma\ss{{}}geblich. Diese Statistik ersetzt keine \"arztliche Beurteilung.}}
+"""
 
 
 def build_weekday_plot(wd, outl, st, metric, ymin, ymax, ylabel, title,
@@ -1010,7 +1221,7 @@ def build_weekday_plot(wd, outl, st, metric, ymin, ymax, ylabel, title,
 def build_document(rows, style, morning_end, midday_end, direction="up",
                    corridor_sys=(120, 129), corridor_dia=(70, 79),
                    corridor_is_custom=False, corridor_label="ESC",
-                   pulse=False, pulse_low=50, show_fences=False):
+                   pulse=False, pulse_low=50, show_fences=False, hourly=True):
     st = style_defs(style)
     # Thread the (possibly custom) target corridor through the style dict so
     # the plot builders can draw and label it without extra parameters.
@@ -1072,8 +1283,8 @@ def build_document(rows, style, morning_end, midday_end, direction="up",
     wd_span = ""
     if hi_day is not None and lo_day is not None and hi_day != lo_day:
         wd_span = (f" Der wochentagsbezogene systolische Median schwankt zwischen "
-                   f"{wd_day_sys[lo_day]:.0f}\\,mmHg ({WEEKDAYS[lo_day]}) und "
-                   f"{wd_day_sys[hi_day]:.0f}\\,mmHg ({WEEKDAYS[hi_day]}).")
+                   f"{round_half_up(wd_day_sys[lo_day])}\\,mmHg ({WEEKDAYS[lo_day]}) und "
+                   f"{round_half_up(wd_day_sys[hi_day])}\\,mmHg ({WEEKDAYS[hi_day]}).")
 
     # Tagesgang-Beschreibung (Morgen vs. Abend systolisch)
     trend = ""
@@ -1083,10 +1294,10 @@ def build_document(rows, style, morning_end, midday_end, direction="up",
             trend = " Der Tagesgang ist nach aktueller Datenlage flach."
         elif d > 0:
             trend = (f" Tendenziell liegt der Abendwert systolisch ueber dem Morgenwert "
-                     f"(Differenz ca.\\ {d:.0f}\\,mmHg).")
+                     f"(Differenz ca.\\ {round_half_up(d)}\\,mmHg).")
         else:
             trend = (f" Tendenziell liegt der Morgenwert systolisch ueber dem Abendwert "
-                     f"(Differenz ca.\\ {abs(d):.0f}\\,mmHg).")
+                     f"(Differenz ca.\\ {round_half_up(abs(d))}\\,mmHg).")
 
     patterns_lib = r"\usetikzlibrary{patterns}" if st["needs_patterns"] else ""
 
@@ -1224,13 +1435,21 @@ def build_document(rows, style, morning_end, midday_end, direction="up",
         r"\vspace{2mm}",
         build_bp_box(sps, dps, 135, 85, corridor_sys, corridor_dia, corridor_label),
     ]
+    stats_section = "\n".join(stats_parts)
+
+    # Puls-Auswertung als EIGENER Abschnitt. Sie wird -- falls angefordert --
+    # bewusst als LETZTER Abschnitt des Dokuments ausgegeben (nach der
+    # stuendlichen Auswertung), damit sie unveraendert am Dokumentende steht.
+    # Eigene Seite (\clearpage), da sie nicht mehr mit der BP-Kennzahlenbox
+    # dieselbe Seite teilt.
+    pulse_parts = []
     if pulse and has_pulse:
         pu_p = agg_pulse_profile(rows, morning_end, midday_end)
         ps = pulse_stats(rows, morning_end, midday_end, pulse_low)
         pulse_plot_tex = build_pulse_plot(pu_p, st, pulse_low)
         pulse_box_tex = build_pulse_box(ps, pulse_low, date_range, n_days)
-        stats_parts += [
-            r"\vspace{6mm}",
+        pulse_parts = [
+            r"\clearpage",
             r"\begin{center}",
             r"{\large\bfseries Puls-Auswertung (Herzfrequenz)}\\[2pt]",
             r"{\footnotesize Median-Puls je Tageszeitblock; relevant zur Beobachtung eines "
@@ -1246,13 +1465,48 @@ def build_document(rows, style, morning_end, midday_end, direction="up",
             pulse_box_tex,
         ]
     elif pulse and not has_pulse:
-        stats_parts += [
-            r"\vspace{4mm}",
+        pulse_parts = [
+            r"\clearpage",
+            r"\vspace*{4mm}",
             r"\noindent{\footnotesize\emph{Hinweis:} Es wurde eine Puls-Auswertung "
             r"angefordert (\texttt{--pulse}), aber das CSV enth\"alt keine verwertbare "
             r"Puls-/Pulsspalte.}",
         ]
-    stats_section = "\n".join(stats_parts)
+    pulse_section = "\n".join(pulse_parts)
+
+    # Stuendliche Auswertung (eigene Seite): 24-Stunden-Profil (Abb. 4) plus
+    # Kennzahlentabelle je belegter Stunde. Standardmaessig aktiv; mit
+    # --no-hourly abschaltbar. Steht nach der BP-Kennzahlenseite und -- falls
+    # eine Puls-Auswertung angefordert ist -- VOR dieser, sodass die
+    # Puls-Auswertung der letzte Abschnitt des Dokuments bleibt. Die
+    # Seitenzaehlung der ersten Seiten bleibt unveraendert.
+    if hourly:
+        sys_h = agg_hour_stats(rows, 2)
+        dia_h = agg_hour_stats(rows, 3)
+        hour_profile_tex = build_hour_profile_plot(sys_h, dia_h, st)
+        hour_box_tex = build_hour_bp_box(sys_h, dia_h, date_range, n_days)
+        hour_section = "\n".join([
+            r"\clearpage",
+            r"\begin{center}",
+            r"{\large\bfseries St\"undliche Auswertung (24-Stunden-Profil)}\\[2pt]",
+            rf"{{\footnotesize\bfseries Auswertungszeitraum: {date_range} \quad ({n_days} Tage)}}",
+            r"\end{center}",
+            r"\vspace{2mm}",
+            r"\begin{center}",
+            hour_profile_tex + r"\\[1mm]",
+            r"{\footnotesize Abbildung~4: Median je voller Tagesstunde (Marker) mit "
+            r"Whisker \"uber den Interquartilsbereich (Q1--Q3); systolisch und "
+            r"diastolisch getrennt. Leere Stunden bleiben als L\"ucke sichtbar, "
+            r"eine d\"unne Linie verbindet nur unmittelbar aufeinanderfolgende "
+            r"Stunden (keine Interpolation \"uber messfreie Stunden). Grau "
+            r"hinterlegt der Zielkorridor, punktiert die Vergleichsschwellen "
+            r"135/85\,mmHg.}",
+            r"\end{center}",
+            r"\vspace{1mm}",
+            hour_box_tex,
+        ])
+    else:
+        hour_section = ""
 
     return rf"""\documentclass[11pt]{{article}}
 \usepackage[ngerman]{{babel}}
@@ -1302,6 +1556,8 @@ def build_document(rows, style, morning_end, midday_end, direction="up",
 
 \noindent{{\footnotesize\textbf{{Interpretationshinweis (automatisch aus den aktuellen Daten).}} Grundlage: {n_total} Messungen an {n_days} Tagen im Zeitraum {date_range}. Systolischer Median morgens ca.\ {med_or_dash(sys_p,'Morgen')}\,mmHg, mittags ca.\ {med_or_dash(sys_p,'Mittag')}\,mmHg, abends ca.\ {med_or_dash(sys_p,'Abend')}\,mmHg (Abend: n={n_abend}); diastolisch morgens ca.\ {med_or_dash(dia_p,'Morgen')}\,mmHg, mittags ca.\ {med_or_dash(dia_p,'Mittag')}\,mmHg, abends ca.\ {med_or_dash(dia_p,'Abend')}\,mmHg.{trend}{wd_span} Insgesamt wurden {n_outliers} Tukey-Ausrei\ss{{}}er markiert ({n_out_hi} nach oben, {n_out_lo} nach unten).{cov} {abend_belastbar} Mit regelm\"a\ss{{}}iger Drei-Punkt-Messung wird insbesondere ein morgendlicher Blutdruckanstieg oder ein abendlicher Wiederanstieg sichtbar -- beides kann f\"ur Einnahmezeitpunkt und Dosierung der Antihypertensiva bedeutsam sein. Die Entscheidung trifft die behandelnde \"Arztin oder der behandelnde Arzt.}}
 {stats_section}
+{hour_section}
+{pulse_section}
 \end{{document}}
 """
 
@@ -1339,6 +1595,12 @@ def main():
                     help="Zeichnet zusaetzlich die obere Tukey-Grenze (Q3+1,5*IQR) je Zelle "
                          "als kurzen waagrechten Strich, sodass sichtbar ist, ab welchem "
                          "Wert ein Punkt als Ausreisser gilt. Standard: aus.")
+    ap.add_argument("--no-hourly", action="store_true",
+                    help="Unterdrueckt die stuendliche Auswertung (24-Stunden-Profil "
+                         "Abb. 4 + Kennzahlentabelle je Stunde auf einer eigenen Seite). "
+                         "Standard: an. Zeigt je voller Tagesstunde 0-23 Median, "
+                         "Q1-Q3, Min-Max und n fuer systolisch und diastolisch, "
+                         "messungsbezogen ueber den gewaehlten Zeitraum.")
     ap.add_argument("--date-from", default=None,
                     help="Startdatum der Auswertung (inklusive). Messungen davor "
                          "werden ignoriert. Formate wie bei den Daten, z. B. "
@@ -1448,7 +1710,8 @@ def main():
                          corridor_is_custom=corridor_is_custom,
                          corridor_label=corridor_label,
                          pulse=args.pulse, pulse_low=args.pulse_low,
-                         show_fences=args.fences)
+                         show_fences=args.fences,
+                         hourly=not args.no_hourly)
     with open(args.out, "w") as f:
         f.write(tex)
     span_txt = ""

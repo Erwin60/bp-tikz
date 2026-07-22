@@ -3,6 +3,62 @@
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
+## [1.3.0] – 2026-07
+
+### Hinzugefügt
+- `generate_bp_daytime_tikz.py`: Neue Seite **„Stündliche Auswertung"**
+  (24-Stunden-Profil) mit **Abbildung 4** — je voller Tagesstunde 0–23 der
+  Median als Marker mit **IQR-Whisker** (Q1–Q3), systolisch und diastolisch
+  getrennt, über den gewählten Zeitraum. Leere Stunden bleiben als Lücke
+  sichtbar; eine dünne Linie verbindet nur unmittelbar aufeinanderfolgende
+  Stunden (keine Interpolation über messfreie Stunden). Zielkorridor und
+  Vergleichsschwellen (135/85) sind wie in Abb. 1 hinterlegt.
+- Darunter eine **Kennzahlentabelle je Stunde** über **alle 24 Stunden**
+  (Median, Q1–Q3, Min–Max, `n`, getrennt für syst./diast.); Stunden ohne
+  Messung sind mit „–" markiert. Alle Werte sind messungsbezogen (ohne
+  Tagesgewichtung), konsistent zur Block-Kennzahlentabelle. Neue Funktionen
+  `agg_hour_stats`, `build_hour_profile_plot`, `build_hour_bp_box`.
+- `--no-hourly` (Standard: aus): unterdrückt die stündliche Auswertung
+  (Abb. 4 + Stunden-Tabelle).
+- `generate_bp_tikz.py`: `--trend-edge-policy {symmetric,both,full}`
+  (Standard: `symmetric`): Randbehandlung der Rollmedian-Linie im
+  Trend-Diagramm (Abb. 3). `symmetric` zeichnet die Linie nur dort, wo das
+  zentrierte Fenster beidseitig vollständig gefüllt ist, und vermeidet damit
+  den Randartefakt, dass die Linie am ersten/letzten Tag durch das einseitig
+  verkürzte Fenster neben der Punktwolke startet; `both` blendet nur echte
+  Einzel-Randtage aus; `full` entspricht dem früheren Verhalten. Die
+  Bildunterschrift erklärt die gewählte Randbehandlung; die
+  Tagesmedian-Punkte bleiben in allen Fällen vollständig.
+
+### Geändert
+- `generate_bp_daytime_tikz.py`: Die **Puls-Auswertung** (`--pulse`, Abb. 3 +
+  Kennzahlenbox) steht jetzt als **eigener Abschnitt am Dokumentende**
+  (letzte Seite, eigene `\clearpage`-Seite) statt gemeinsam mit der
+  BP-Kennzahlentabelle auf der Statistik-Seite. Die Reihenfolge ist damit:
+  Hauptteil → „Statistische Kennzahlen" → „Stündliche Auswertung" →
+  (optional) „Puls-Auswertung". Der Puls-Inhalt selbst ist unverändert.
+- `generate_bp_tikz.py`: Anzeige der Mittelwert-/Median-Kennzahlen im
+  x-Achsen-Label und im Fließtext auf **ganze mmHg kaufmännisch gerundet**
+  (`round_half_up`, z. B. 128,5 → 129; vorher eine Nachkommastelle mit
+  Banker's Rounding). Alle Berechnungen und Koordinaten arbeiten unverändert
+  mit den exakten Werten.
+- `generate_bp_tikz.py`: Die Zielkorridor-Flächen erhalten in Tages-,
+  Wochen- und Trend-Diagramm einen **dünnen sichtbaren Rand** und einen
+  Legenden-Eintrag (`area legend, draw=gray!55`), zuvor randlos.
+- `generate_bp_tikz.py`: Der erläuternde Absatz stellt ausdrücklich klar, dass
+  Mittelwert und Median **tagesgewichtet** sind (jeder Kalendertag zählt
+  gleich, unabhängig von der Messanzahl); kleinere Typo-/Umlaut-Korrekturen
+  in den Trend-Achsenbeschriftungen.
+- Dokumentation: Optionstabellen `docs/optionen_daytime.csv`
+  (`--no-hourly`; präzisierte `--pulse`-Beschreibung) und
+  `docs/optionen_bp_tikz.csv` (`--trend-edge-policy`) ergänzt; Handbücher
+  (`Manual_Daytime_DE.md`/`Manual_Daytime_EN.md`) und `README.md` um die
+  Stundenseite und die neue Puls-Platzierung erweitert.
+- Beispiele: `examples/fig_weekday_daytime_color.pdf` und
+  `examples/fig_weekday_daytime_bw.pdf` aus `examples/bp_anon_example.csv`
+  neu erzeugt; sie enthalten jetzt die Seite „Statistische Kennzahlen" und
+  die neue Seite „Stündliche Auswertung".
+
 ## [1.2.9] – 2026-07
 
 ### Geändert

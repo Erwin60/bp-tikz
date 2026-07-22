@@ -62,6 +62,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -250,6 +251,20 @@ def parse_number(value: Any) -> Optional[float]:
 
 def mean(values: Sequence[float]) -> float:
     return sum(values) / len(values)
+
+
+def round_half_up(value: float) -> int:
+    """Kaufmaennische Rundung auf ganze mmHg fuer die Anzeige.
+
+    Pythons eingebautes round()/format(".0f") verwendet Banker's Rounding und
+    wuerde 128.5 auf 128 abrunden. Fuer die Darstellung im Diagramm und im
+    Fliesstext ist die kaufmaennische Rundung (128.5 -> 129) erwartungskonform.
+    Die Rundung betrifft ausschliesslich die Anzeige; alle Berechnungen,
+    Koordinaten und Achsenskalierungen arbeiten unveraendert mit den exakten
+    Gleitkommawerten.
+    """
+    return int(Decimal(repr(float(value))).quantize(Decimal("1"),
+                                                    rounding=ROUND_HALF_UP))
 
 
 def median(values: Sequence[float]) -> float:
@@ -696,21 +711,63 @@ def xticks_for_trend(daily: Sequence[DailyStats]) -> Tuple[str, str]:
     return ",".join(str(t) for t in ticks), ",".join(labels)
 
 
-def trend_coordinates(daily: Sequence[DailyStats], window: int) -> Dict[str, str]:
+def trend_coordinates(
+    daily: Sequence[DailyStats],
+    window: int,
+    edge_policy: str = "symmetric",
+) -> Dict[str, str]:
     """Koordinaten fuer das Trend-Diagramm: Tagesmediane als Punkte plus ein
     zentrierter gleitender Median ueber ein Kalenderfenster von `window` Tagen
-    (kalenderbasiert, d. h. Messluecken verbreitern das Fenster nicht)."""
+    (kalenderbasiert, d. h. Messluecken verbreitern das Fenster nicht).
+
+    Randbehandlung der Rollmedian-Linie (`edge_policy`):
+      * "symmetric" (Standard): Ein Linienpunkt wird nur gezeichnet, wenn das
+        zentrierte Fenster auf BEIDEN Seiten die volle Haelfte (`half` Tage)
+        an tatsaechlichen Messtagen enthaelt. Damit beruht jeder gezeichnete
+        Punkt auf einem vollstaendigen, symmetrischen Fenster. Das vermeidet den
+        typischen Randartefakt, dass die Linie am ersten/letzten Tag durch das
+        einseitig abgeschnittene Fenster deutlich neben der Punktwolke startet
+        (z. B. Start bei 133 mmHg, obwohl der erste Tagesmedian 124 mmHg ist).
+      * "both": schwaechere Bedingung -- es genuegt mindestens ein Messtag auf
+        jeder Seite. Blendet nur echte Einzel-Randpunkte aus.
+      * "full": zeichnet die Linie ueber ALLE Tage (frueheres Verhalten, mit
+        einseitig verkuerztem Fenster am Rand).
+
+    An den ausgeblendeten Randtagen bleiben die Tagesmedian-PUNKTE sichtbar;
+    nur die Verlaufslinie beginnt bzw. endet dort, wo ihr Fenster belastbar ist.
+    """
     half = max(0, (window - 1) // 2)
-    sys_pts = " ".join(coord_point(d.day_index, d.sys_median) for d in daily)
-    dia_pts = " ".join(coord_point(d.day_index, d.dia_median) for d in daily)
-    sys_roll, dia_roll = [], []
-    for d in daily:
-        win = [x for x in daily if abs(x.day_index - d.day_index) <= half]
-        sys_roll.append(coord_point(d.day_index, median([x.sys_median for x in win])))
-        dia_roll.append(coord_point(d.day_index, median([x.dia_median for x in win])))
+    days = list(daily)
+    idx_present = {x.day_index for x in days}
+
+    def has_side(center: int, lo: int, hi: int, need: int) -> bool:
+        """True, wenn im Indexbereich [lo, hi] mindestens `need` tatsaechliche
+        Messtage liegen (Center ausgenommen)."""
+        return sum(1 for i in idx_present if lo <= i <= hi and i != center) >= need
+
+    def line_for(attr: str) -> str:
+        pts: List[str] = []
+        for d in days:
+            c = d.day_index
+            win = [x for x in days if abs(x.day_index - c) <= half]
+            if edge_policy == "symmetric":
+                ok = (has_side(c, c - half, c - 1, half)
+                      and has_side(c, c + 1, c + half, half))
+            elif edge_policy == "both":
+                ok = (has_side(c, c - half, c - 1, 1)
+                      and has_side(c, c + 1, c + half, 1))
+            else:  # "full": frueheres Verhalten
+                ok = True
+            if not ok:
+                continue
+            pts.append(coord_point(c, median([getattr(x, attr) for x in win])))
+        return " ".join(pts)
+
+    sys_pts = " ".join(coord_point(d.day_index, d.sys_median) for d in days)
+    dia_pts = " ".join(coord_point(d.day_index, d.dia_median) for d in days)
     return {
         "sys_pts": sys_pts, "dia_pts": dia_pts,
-        "sys_roll": " ".join(sys_roll), "dia_roll": " ".join(dia_roll),
+        "sys_roll": line_for("sys_median"), "dia_roll": line_for("dia_median"),
     }
 
 
@@ -738,6 +795,7 @@ def generate_latex(
     corridor_label: str = "ESC",
     trend: bool = False,
     trend_window: int = 7,
+    trend_edge_policy: str = "symmetric",
 ) -> str:
     if not daily:
         raise ValueError("No daily statistics available")
@@ -939,8 +997,8 @@ def generate_latex(
     if show_daily_summary_label:
         daily_xlabel = (
             f"Tage seit {date_from.strftime('%d.%m.%Y')} | "
-            f"Mittelwert {avg_sys:.1f}/{avg_dia:.1f} mmHg | "
-            f"Median {med_sys_med:.1f}/{med_dia_med:.1f} mmHg | "
+            f"Mittelwert {round_half_up(avg_sys)}/{round_half_up(avg_dia)} mmHg | "
+            f"Median {round_half_up(med_sys_med)}/{round_half_up(med_dia_med)} mmHg | "
             f"\\textless{{}}135/85: {under_135_85}/{n_days} Tage"
         )
 
@@ -960,7 +1018,7 @@ def generate_latex(
 """
 
     text_paragraph = f"""
-Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis zum {actual_to.strftime('%d.%m.%Y')} insgesamt {total_readings} dokumentierte häusliche Blutdruckmessungen an {n_days} Kalendertagen vor. Für die Auswertung werden die Einzelmessungen zunächst pro Kalendertag zusammengefasst, damit Tage mit vielen Messungen nicht stärker gewichtet werden als Tage mit wenigen Messungen. Auf Basis der gleich nach Tagen gewichteten Tagesmittel ergibt sich ein durchschnittlicher häuslicher Blutdruck von ungefähr {avg_sys:.1f}/{avg_dia:.1f}\\,mmHg. Der Median der Tagesmediane liegt bei ungefähr {med_sys_med:.1f}/{med_dia_med:.1f}\\,mmHg. {under_135_85} von {n_days} Tagesmitteln lagen unter 135/85\\,mmHg. {reference_note}
+Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis zum {actual_to.strftime('%d.%m.%Y')} insgesamt {total_readings} dokumentierte häusliche Blutdruckmessungen an {n_days} Kalendertagen vor. Für die Auswertung werden die Einzelmessungen zunächst pro Kalendertag zusammengefasst, damit Tage mit vielen Messungen nicht stärker gewichtet werden als Tage mit wenigen Messungen. Auf Basis der gleich nach Tagen gewichteten Tagesmittel ergibt sich ein durchschnittlicher häuslicher Blutdruck von ungefähr {round_half_up(avg_sys)}/{round_half_up(avg_dia)}\\,mmHg. Der Median der Tagesmediane liegt bei ungefähr {round_half_up(med_sys_med)}/{round_half_up(med_dia_med)}\\,mmHg. Beide Kennzahlen sind \\emph{{tagesgewichtet}}: Jeder Kalendertag geht mit gleichem Gewicht ein, unabhängig von der Anzahl der an diesem Tag durchgeführten Messungen. {under_135_85} von {n_days} Tagesmitteln lagen unter 135/85\\,mmHg. {reference_note}
 """
 
     fig1 = f"""
@@ -987,9 +1045,9 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
     tick label style={{font=\\scriptsize}},
     label style={{font=\\small}},
 ]
-\\addplot[draw=none, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
+\\addplot[area legend, draw=gray!55, line width=0.3pt, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
 \\addlegendentry{{{corridor_label}-Zielkorridor syst. {cs_lo}--{cs_hi}}}
-\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
+\\addplot[area legend, draw=gray!55, line width=0.3pt, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
 \\addlegendentry{{{corridor_label}-Zielkorridor diast. {cd_lo}--{cd_hi}}}
 \\addplot[dashdotted, black] coordinates {{({xmin},{cs_hi}) ({xmax},{cs_hi})}};
 \\addlegendentry{{Obergrenze {corridor_label}-Korridor syst. {cs_hi}}}
@@ -1061,9 +1119,9 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
     tick label style={{font=\\scriptsize}},
     label style={{font=\\small}},
 ]
-\\addplot[draw=none, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
+\\addplot[area legend, draw=gray!55, line width=0.3pt, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
 \\addlegendentry{{{corridor_label}-Zielkorridor syst. {cs_lo}--{cs_hi}}}
-\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
+\\addplot[area legend, draw=gray!55, line width=0.3pt, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
 \\addlegendentry{{{corridor_label}-Zielkorridor diast. {cd_lo}--{cd_hi}}}
 \\addplot[dashdotted, black] coordinates {{({xmin},{cs_hi}) ({xmax},{cs_hi})}};
 \\addlegendentry{{Obergrenze {corridor_label}-Korridor syst. {cs_hi}}}
@@ -1093,13 +1151,30 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
     # bzw. laengere Bloecke zu stark glaettend waeren.
     fig3 = ""
     if trend:
-        tc = trend_coordinates(daily, trend_window)
+        win_txt = f"{trend_window}"
+        tc = trend_coordinates(daily, trend_window, edge_policy=trend_edge_policy)
+        # Hinweis in der Bildunterschrift, wenn die Verlaufslinie am Rand
+        # bewusst erst dort beginnt, wo das Fenster belastbar gefuellt ist.
+        if trend_edge_policy == "symmetric":
+            trend_edge_caption = (
+                " Die Verlaufslinie beginnt bzw. endet erst dort, wo das "
+                f"{win_txt}-Tage-Fenster beidseitig vollständig gefüllt ist; "
+                "an den Rändern bleiben die Tagesmedian-Punkte sichtbar, ohne "
+                "dass das einseitig verkürzte Fenster die Linie verzerrt."
+            )
+        elif trend_edge_policy == "both":
+            trend_edge_caption = (
+                " Einzelne Randtage ohne beidseitige Nachbarn im Fenster werden "
+                "in der Verlaufslinie ausgelassen; ihre Tagesmedian-Punkte "
+                "bleiben sichtbar."
+            )
+        else:
+            trend_edge_caption = ""
         trend_ticks, trend_labels = xticks_for_trend(daily)
         med_vals_sys = [d.sys_median for d in daily]
         med_vals_dia = [d.dia_median for d in daily]
         t_lo = int(math.floor(min(med_vals_dia + [corridor_dia_lo]) / 5.0) * 5) - 5
         t_hi = int(math.ceil(max(med_vals_sys + [135.0, corridor_sys_hi]) / 5.0) * 5) + 5
-        win_txt = f"{trend_window}"
         fig3 = f"""
 \\begin{{figure*}}[!t]
 \\centering
@@ -1112,17 +1187,18 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
     xmin={xmin},
     xmax={xmax},
     grid=major,
-    xlabel={{Datum (Monatsanfaenge) | Zeitraum ab {date_from.strftime('%d.%m.%Y')}}},
+    xlabel={{Datum (Monatsanfänge) | Zeitraum ab {date_from.strftime('%d.%m.%Y')}}},
+    xlabel style={{font=\\scriptsize}},
     ylabel={{Blutdruck [mmHg]}},
     xtick={{{trend_ticks}}},
     xticklabels={{{trend_labels}}},
-    legend style={{font=\\scriptsize, at={{(0.5,-0.15)}}, anchor=north, legend columns=3, draw=none}},
+    legend style={{font=\\scriptsize, at={{(0.5,-0.20)}}, anchor=north, legend columns=3, draw=none}},
     tick label style={{font=\\scriptsize}},
     label style={{font=\\small}},
 ]
-\\addplot[draw=none, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
+\\addplot[area legend, draw=gray!55, line width=0.3pt, fill=black!8] coordinates {{({xmin},{cs_lo}) ({xmax},{cs_lo}) ({xmax},{cs_hi}) ({xmin},{cs_hi})}} \\closedcycle;
 \\addlegendentry{{{corridor_label}-Zielkorridor syst. {cs_lo}--{cs_hi}}}
-\\addplot[draw=none, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
+\\addplot[area legend, draw=gray!55, line width=0.3pt, fill=gray!8] coordinates {{({xmin},{cd_lo}) ({xmax},{cd_lo}) ({xmax},{cd_hi}) ({xmin},{cd_hi})}} \\closedcycle;
 \\addlegendentry{{{corridor_label}-Zielkorridor diast. {cd_lo}--{cd_hi}}}
 \\addplot[only marks, mark=*, mark size=0.55pt, black!45] coordinates {{{tc['sys_pts']}}};
 \\addlegendentry{{Tagesmedian syst. (Punkte)}}
@@ -1139,7 +1215,7 @@ Seit dem {date_from.strftime('%d.%m.%Y')} liegen im ausgewerteten Zeitraum bis z
 {daily_corridor_annotation}
 \\end{{axis}}
 \\end{{tikzpicture}}
-\\caption{{Langzeit-Trend: Jeder Punkt ist der unveränderte Tagesmedian (keine Blockbildung); die Linien zeigen den zentrierten gleitenden {win_txt}-Tage-Median als Verlaufsglättung. Das Kalenderfenster überbrückt Messlücken, verbreitert sich dadurch aber nicht. Zu Korridoren und Vergleichslinien siehe Absatz oben.}}
+\\caption{{Langzeit-Trend: Jeder Punkt ist der unveränderte Tagesmedian (keine Blockbildung); die Linien zeigen den zentrierten gleitenden {win_txt}-Tage-Median als Verlaufsglättung.{trend_edge_caption} Das Kalenderfenster überbrückt Messlücken, verbreitert sich dadurch aber nicht. Zu Korridoren und Vergleichslinien siehe Absatz oben.}}
 \\label{{fig:bp_trend}}
 \\end{{figure*}}
 """
@@ -1419,6 +1495,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trend-window", type=int, default=7,
                         help="Kalenderfensterbreite in Tagen fuer den gleitenden Median des "
                              "Trend-Diagramms (zentriert; ungerade Werte empfohlen). Standard: 7.")
+    parser.add_argument("--trend-edge-policy", choices=["symmetric", "both", "full"],
+                        default="symmetric",
+                        help="Randbehandlung der Rollmedian-Linie im Trend-Diagramm (Abb. 3). "
+                             "'symmetric' (Standard): Linie nur, wo das zentrierte Fenster "
+                             "beidseitig voll gefuellt ist -- vermeidet den Randartefakt, dass die "
+                             "Linie am ersten/letzten Tag durch das einseitig verkuerzte Fenster "
+                             "neben der Punktwolke startet. 'both': nur Tage ohne beidseitige "
+                             "Nachbarn auslassen. 'full': Linie ueber alle Tage (frueheres "
+                             "Verhalten). Die Tagesmedian-Punkte sind in allen Faellen vollstaendig.")
     parser.add_argument("--week-central", choices=["mean", "median"], default="mean", help="Central line of the weekly chart: 'mean' (default; nach Kalendertagen gewichteter Mittelwert der Tagesmittelwerte, an die klinischen HBPM/ESC-Mittelwertschwellen anschlussfähig) or 'median' (Median der Tagesmediane; konsistent zur IQR-Box und robuster gegen Ausreißertage).")
     parser.add_argument("--corridor", default=None, metavar="SYS_LO-SYS_HI/DIA_LO-DIA_HI",
                         help="Zielkorridor als 'sys_lo-sys_hi/dia_lo-dia_hi', z. B. '110-119/70-79' fuer einen aneurysmaspezifisch niedrigeren Korridor. Ohne Angabe bleibt der Standard (ESC-Orientierung 120-129/70-79). Ein abweichender Korridor wird in Legende, Absatz und Bildunterschrift als individuell gewaehlt gekennzeichnet.")
@@ -1555,6 +1640,7 @@ def main() -> int:
         week_central=args.week_central,
         trend=args.trend,
         trend_window=args.trend_window,
+        trend_edge_policy=args.trend_edge_policy,
         **corridor_kwargs,
     )
     args.out.write_text(latex, encoding="utf-8")

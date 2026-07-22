@@ -26,6 +26,21 @@ Abbildungen.
 - **Abbildung 2 — Wochentag × Tageszeit:** gruppierte Median-Balken je Wochentag
   und Block (2a systolisch, 2b diastolisch), mit **Tukey-Ausreißern** (Kreis =
   nach oben, optional `×` = nach unten), ESC-Korridor und Vergleichslinie.
+- **Statistische Kennzahlen (eigene Seite):** eine Blutdruck-Kennzahlentabelle je
+  Zeitraum (Gesamt/Morgen/Mittag/Abend), für systolisch und diastolisch getrennt —
+  Median, Q1–Q3, Min–Max, Anzahl der Messungen `n`, Anzahl Werte ab der
+  Vergleichsschwelle (≥ 135/≥ 85) und die Spalte **„im Ziel"** (Messungen
+  *innerhalb* des Zielkorridors).
+- **Abbildung 4 — 24-Stunden-Profil (eigene Seite):** je voller Tagesstunde 0–23
+  der Median als Marker mit **IQR-Whisker** (Q1–Q3), systolisch und diastolisch
+  getrennt. Leere Stunden bleiben als Lücke sichtbar; eine dünne Linie verbindet
+  nur unmittelbar aufeinanderfolgende Stunden (keine Interpolation über messfreie
+  Stunden). Darunter eine **Kennzahlentabelle je Stunde** über alle 24 Stunden
+  (Median, Q1–Q3, Min–Max, `n`; Stunden ohne Messung mit „–"), messungsbezogen
+  über den Zeitraum. Abschaltbar mit `--no-hourly`.
+- **Puls-Auswertung (`--pulse`, letzte Seite):** Abb. 3 Puls-Tagesprofil (Median je
+  Block, IQR-Band, punktierte Bradykardie-Schwellenlinie) plus Kennzahlenbox —
+  als eigener Abschnitt am **Dokumentende**.
 
 Die Kopfzeile nennt automatisch den **Auswertungszeitraum** (von–bis) und die
 Anzahl der Messungen/Tage. Der Interpretationshinweis am Fuß wird vollständig aus
@@ -44,8 +59,11 @@ Beispieldokumente liegen im Ordner `examples/`:
 - [`examples/fig_weekday_daytime_color.pdf`](../examples/fig_weekday_daytime_color.pdf)
   — Farbvariante (`--style color`)
 
-Beide zeigen Tagesprofil (Abb. 1), Stunden-Histogramm (Abb. 1b) und die
-Wochentagsauswertung (Abb. 2a/2b) auf zwei Seiten.
+Beide zeigen auf mehreren Seiten das Tagesprofil (Abb. 1), das Stunden-Histogramm
+(Abb. 1b) und die Wochentagsauswertung (Abb. 2a/2b), gefolgt von der Seite
+„Statistische Kennzahlen" und der Seite „Stündliche Auswertung" mit dem
+24-Stunden-Profil (Abb. 4) und der Kennzahlentabelle je Stunde (ohne `--pulse`
+erzeugt; mit `--pulse` käme eine abschließende Seite „Puls-Auswertung" hinzu).
 
 ---
 
@@ -96,7 +114,13 @@ verarbeitet.
 | `--style color\|bw` | nein | `color` | Farb- oder Schwarz-Weiß-Variante. |
 | `--blocks "a,b"` | nein | `10,15` | Grenzen der drei Tageszeitblöcke (Stunden). |
 | `--outliers up\|both\|none` | nein | `up` | Tukey-Ausreißer: nur oben / oben+unten / keine. |
+| `--pulse` | nein | aus | Puls-Auswertung als eigener Abschnitt am Dokumentende (Abb. 3 + Kennzahlenbox). |
+| `--no-hourly` | nein | aus | Unterdrückt die stündliche Auswertung (24-Stunden-Profil Abb. 4 + Kennzahlentabelle je Stunde). |
 | `-o`, `--out OUT` | nein | `bp_weekday_daytime.tex` | Name der Ausgabedatei. |
+
+Die vollständige Optionsliste (u. a. `--corridor`, `--corridor-label`,
+`--pulse-low`, `--fences`, `--name`, `--date-from`/`--date-to`) steht in
+[`optionen_daytime.csv`](optionen_daytime.csv).
 
 **Schwarz-Weiß (`--style bw`):** Graustufen + Muster (Morgen solide, Mittag
 nordost-schraffiert, Abend punktiert); im Tagesprofil systolisch durchgezogen,

@@ -24,6 +24,21 @@ document (A4) with two figures.
 - **Figure 2 — weekday × time-of-day:** grouped median bars per weekday and block
   (2a systolic, 2b diastolic), with **Tukey outlier** markers (circle = high,
   optional `×` = low), the ESC corridor, and the comparison line.
+- **Statistics page (own page):** a blood-pressure summary table per period
+  (Overall/Morning/Midday/Evening), separately for systolic and diastolic —
+  median, Q1–Q3, min–max, number of readings `n`, count at/above the comparison
+  threshold (≥ 135/≥ 85) and the **"in target"** column (readings *within* the
+  target corridor).
+- **Figure 4 — 24-hour profile (own page):** for each full hour of day 0–23 the
+  median as a marker with an **IQR whisker** (Q1–Q3), systolic and diastolic
+  shown separately. Empty hours remain visible as gaps; a thin line connects only
+  immediately consecutive hours (no interpolation across measurement-free hours).
+  Below it, an **hourly summary table** over all 24 hours (median, Q1–Q3,
+  min–max, `n`; hours without a reading marked "–"), reading-weighted over the
+  period. Can be switched off with `--no-hourly`.
+- **Pulse analysis (`--pulse`, last page):** Fig. 3 pulse profile (median per
+  block, IQR band, dotted bradycardia threshold) plus a summary box — as its own
+  section at the **end of the document**.
 
 The header automatically prints the **evaluation period** (from–to) and the
 number of readings/days. The interpretation note at the foot is computed entirely
@@ -42,8 +57,11 @@ Example documents generated from the anonymized sample CSV
 - [`examples/fig_weekday_daytime_color.pdf`](../examples/fig_weekday_daytime_color.pdf)
   — color variant (`--style color`)
 
-Both show the daily profile (Fig. 1), the hour-of-day histogram (Fig. 1b), and
-the weekday analysis (Fig. 2a/2b) across two pages.
+Both show, across several pages, the daily profile (Fig. 1), the hour-of-day
+histogram (Fig. 1b), and the weekday analysis (Fig. 2a/2b), followed by the
+"Statistics" page and the "Hourly analysis" page with the 24-hour profile
+(Fig. 4) and the hourly summary table (generated without `--pulse`; with
+`--pulse` a final "Pulse analysis" page would be appended).
 
 ---
 
@@ -93,7 +111,13 @@ The iBP format, where the time is held in the `Note` column, is handled as well.
 | `--style color\|bw` | no | `color` | Color or black-and-white variant. |
 | `--blocks "a,b"` | no | `10,15` | Boundaries of the three blocks (hours). |
 | `--outliers up\|both\|none` | no | `up` | Tukey outliers: high only / high+low / none. |
+| `--pulse` | no | off | Pulse analysis as its own section at the end of the document (Fig. 3 + summary box). |
+| `--no-hourly` | no | off | Suppress the hourly analysis (24-hour profile Fig. 4 + hourly summary table). |
 | `-o`, `--out OUT` | no | `bp_weekday_daytime.tex` | Output file name. |
+
+The full option list (including `--corridor`, `--corridor-label`, `--pulse-low`,
+`--fences`, `--name`, `--date-from`/`--date-to`) is in
+[`optionen_daytime.csv`](optionen_daytime.csv).
 
 **Black-and-white (`--style bw`):** grayscale + patterns (morning solid, midday
 north-east hatch, evening dots); in the daily profile, systolic solid and
