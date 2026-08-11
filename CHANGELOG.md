@@ -3,6 +3,72 @@
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format orientiert an *Keep a Changelog*; Versionierung nach *SemVer*.
 
+## [1.3.2] – 2026-08-09
+
+### Hinzugefügt
+- **`bp_merge.py`** — führt eine bestehende CSV und den vollständigen Export
+  einer Blutdruck-App taggenau zu einer Datei zusammen. Hintergrund: Apps
+  exportieren jedes Mal ihren kompletten Bestand, nicht nur die Neuzugänge;
+  einfaches Anhängen erzeugt deshalb bei jedem Lauf Dubletten. Das Skript
+  hängt nicht an, sondern **baut die Datei neu auf**:
+  `CSV = Bestand (Tage vor dem Stichtag) + App-Export (Tage ab dem Stichtag)`.
+  Der Stichtag ist der Tag der Umstellung und bleibt für immer derselbe;
+  Dubletten sind dadurch konstruktiv ausgeschlossen und der Lauf ist beliebig
+  wiederholbar (zweimal aufgerufen entsteht dieselbe Datei). Nachträglich in
+  der App korrigierte Messungen kommen automatisch mit.
+  - Bestand und Export dürfen **unterschiedliche Formate** haben (klassischer
+    iBP-Export oder Spalten-CSV mit Komma, Semikolon oder Tabulator). Die
+    Zuordnung erfolgt über die Spaltennamen, die Reihenfolge ist frei; für den
+    Puls werden zusätzlich `Pul` und `BPM` akzeptiert.
+  - Kanonische Ausgabe `Datum;Zeit;Systolisch;Diastolisch;Puls;Notiz`. Die
+    Kopfzeile enthält bewusst **nicht** `Mean Arterial Pressure`/`Pulse
+    Pressure`, weil diese beiden Namen in beiden Generatoren die
+    positionsbasierte iBP-Normalisierung auslösen — die Spaltenreihenfolge
+    bleibt dadurch dauerhaft unkritisch.
+  - `--app` akzeptiert ein **Dateimuster** (z. B. `Blutdruck_*.csv`), weil
+    viele Apps das Exportdatum in den Dateinamen schreiben; verwendet wird die
+    zuletzt geänderte passende Datei, bei mehreren Treffern werden alle mit
+    Zeitstempel genannt.
+  - Schutzmechanismen: `--ab` ist beim Schreiben in dieselbe Datei Pflicht;
+    Sicherungskopie `<datei>.bak-JJJJMMTT-HHMMSS`; atomares Schreiben über
+    `os.replace`; Abbruch, wenn der Export keine Messung ab dem Stichtag
+    enthält oder wenn darin Tage fehlen, die in der Datei bereits stehen
+    (veralteter Export); Nachkontrolle durch erneutes Einlesen.
+  - `--probelauf`, `--aus` (abweichende Zieldatei) und `--person NAME`
+    (Konfiguration aus `bp_build.py`).
+- **`bp_build.py`** — Komplettlauf für eine oder mehrere Personen: erzeugt die
+  Grafiken beider Generatoren und kompiliert die drei LaTeX-Dokumente je zwei
+  Durchläufe, prüft nach jedem Schritt die Existenz der erwarteten Datei und
+  räumt die LaTeX-Hilfsdateien nur bei Erfolg auf. Personen mit einem
+  `merge`-Eintrag durchlaufen davor automatisch `bp_merge.py`;
+  `--kein-merge` überspringt diesen Schritt. Weiter: `--alle`, `--liste`,
+  `--keep-aux`. Die mitgelieferte `PERSONEN`-Tabelle ist eine **Vorlage mit
+  zwei Beispielpersonen**.
+- `docs/optionen_merge.csv` und `docs/Manual_Merge_DE.md`.
+- `examples/merge_bestand_example.csv` und
+  `examples/merge_app_export_example.csv` — synthetisches Paar zum
+  Ausprobieren des Zusammenführens (unterschiedliche Formate, Export
+  absteigend sortiert).
+
+### Behoben
+- `.gitignore` schützt jetzt tatsächlich vor dem Commit echter Messdaten.
+  `GITHUB.md` behauptete bisher, `*_Readings*.csv` sei ausgeschlossen — dieses
+  Muster fehlte in der `.gitignore` jedoch. Ergänzt wurden `*_Readings*.csv`,
+  `*_readings*.csv`, `iBP_*.csv`, `Blutdruck_*.csv`, `*.csv.bak-*` und
+  `bp_build_local.py`, mit einer Ausnahme für `examples/*.csv`.
+- `GITHUB.md` verwies auf `examples/example_readings.csv`; die Datei heißt
+  `examples/bp_anon_example.csv`.
+- `bp_build.py`: `subprocess.run(..., text=True)` dekodiert strikt als UTF-8.
+  `pdflatex` gibt gesetzten Text im Log wieder und schreibt Umlaute dabei als
+  8-Bit-Byte (z. B. `tags\xfcber`), was zu einem `UnicodeDecodeError` führte —
+  und zwar erst **nachdem** `pdflatex` erfolgreich war. Ob es auftritt, hängt
+  vom Zeilenumbruch im Log ab, der Fehler trat daher nur sporadisch auf.
+  Behoben mit `encoding="utf-8", errors="replace"`.
+
+### Unverändert
+- `generate_bp_tikz.py` und `generate_bp_daytime_tikz.py` sind gegenüber 1.3.1
+  **unverändert**. Die neuen Skripte setzen auf ihnen auf, ohne sie zu ändern.
+
 ## [1.3.1] – 2026-07-22
 
 ### Geändert

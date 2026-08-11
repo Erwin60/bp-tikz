@@ -64,9 +64,13 @@ geklontes Repo übernehmen willst:
 ```bash
 cp ~/Downloads/generate_bp_tikz.py          ./generate_bp_tikz.py
 cp ~/Downloads/generate_bp_daytime_tikz.py  ./generate_bp_daytime_tikz.py
+cp ~/Downloads/bp_build.py                  ./bp_build.py
+cp ~/Downloads/bp_merge.py                  ./bp_merge.py
 cp ~/Downloads/optionen_bp_tikz.csv         ./docs/optionen_bp_tikz.csv
 cp ~/Downloads/optionen_daytime.csv         ./docs/optionen_daytime.csv
+cp ~/Downloads/optionen_merge.csv           ./docs/optionen_merge.csv
 
+git status          # pruefen, dass keine echten Messdaten dabei sind
 git add -A
 git commit -m "Update scripts and option tables"
 git push
@@ -74,9 +78,17 @@ git push
 
 ## Hinweise
 
-- Die `.gitignore` schließt generierte LaTeX/PDF-Dateien **und** echte
-  Messdaten (`*_Readings*.csv`) bewusst aus. Lade keine realen
-  Gesundheitsdaten hoch; im Repo liegt nur `examples/example_readings.csv`
-  mit synthetischen Werten.
+- Die `.gitignore` schließt generierte LaTeX-Dateien **und** echte Messdaten
+  aus: `*_Readings*.csv`, `*_readings*.csv`, `iBP_*.csv`, `Blutdruck_*.csv`
+  und Sicherungskopien `*.csv.bak-*`, mit einer ausdrücklichen Ausnahme für
+  `examples/*.csv`. Lade keine realen Gesundheitsdaten hoch; im Repo liegen
+  nur die synthetischen Dateien unter `examples/`
+  (`bp_anon_example.csv`, `merge_bestand_example.csv`,
+  `merge_app_export_example.csv`).
+- Die `PERSONEN`-Tabelle in `bp_build.py` ist eine **Vorlage mit
+  Beispielpersonen**. Echte Namen, Dateinamen und medizinische Angaben wie ein
+  individueller Zielkorridor gehören nicht in ein öffentliches Repo. Wer die
+  eigene Konfiguration versehentlich nicht committen will, legt sie als
+  `bp_build_local.py` ab – dieser Name ist in der `.gitignore` enthalten.
 - Vor dem ersten Push mit `git status` prüfen, dass keine persönlichen CSVs
   oder PDFs aufgenommen werden – besonders bei einem öffentlichen Repo.

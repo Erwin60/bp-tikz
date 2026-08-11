@@ -15,8 +15,22 @@
 bp_diagrams.tex
 bp_diagrams_both_onepage_standalone.tex
 bp_diagrams_standalone_two_sides.tex
+bp_weekday_daytime.tex
 bp_daily_stats.csv
 bp_weekly_stats.csv
+
+# Real measurement data -- NEVER commit health data.
+# The only readings in this repository are the synthetic files in examples/.
+*_Readings*.csv
+*_readings*.csv
+iBP_*.csv
+Blutdruck_*.csv
+*.csv.bak-*
+!examples/*.csv
+
+# Personal configuration of bp_build.py (real names, files, target corridors).
+# The tracked bp_build.py is a template with example persons.
+bp_build_local.py
 
 # OS / editor
 .DS_Store
@@ -28,3 +42,4 @@ __pycache__/
 *.texpadtmp/
 RECONCILE_WORKFLOW.md
 RELEASE_OVERWRITE.md
+RELEASE_1.3.2.md

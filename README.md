@@ -4,7 +4,7 @@
 
 Werkzeuge, die aus einer CSV mit häuslichen Blutdruckmessungen LaTeX/PGFPlots-Diagramme erzeugen.
 
-Zwei Skripte:
+Zwei Generatoren erzeugen die Diagramme, zwei Hilfsskripte automatisieren den Ablauf drumherum:
 
 ### `generate_bp_tikz.py` – Tages- und Wochenverlauf
 
@@ -17,11 +17,25 @@ Die Aggregation ist zweistufig (zuerst Tageskennwerte, dann über die Tage), dam
 
 Ein Diagramm, das die Messungen nach Tageszeit-Blöcken (Nacht/Morgen/Tag/Abend) und Wochentag aufschlüsselt; umschaltbar zwischen Farbe und Schwarz-Weiß. Dazu eine eigene Seite **„Statistische Kennzahlen"** mit einer Blutdruck-Kennzahlentabelle und eine Seite **„Stündliche Auswertung"** mit einem 24-Stunden-Profil (Median je Stunde mit IQR-Whisker) samt Kennzahlentabelle je Stunde 0–23. Optional als letzte Seite eine Puls-Auswertung (`--pulse`).
 
+### `bp_build.py` – Komplettlauf
+
+Erzeugt für eine oder mehrere konfigurierte Personen nacheinander die Grafiken und kompiliert die LaTeX-Dokumente. Optional läuft davor `bp_merge.py`.
+
+### `bp_merge.py` – Bestand und App-Export zusammenführen
+
+Führt eine bestehende CSV und den vollständigen Export einer Blutdruck-App taggenau zu einer Datei zusammen, ohne Dubletten zu erzeugen.
+
 ## Schnellstart
 
 ```bash
 python3 generate_bp_tikz.py --csv iBP_Readings.csv --date-from 15.05.2026
 python3 generate_bp_daytime_tikz.py --csv iBP_Readings.csv
+```
+
+Oder in einem Zug über die Personen-Konfiguration:
+
+```bash
+python3 bp_build.py Eva
 ```
 
 `--date-from` ist bei beiden Skripten optional. Ohne die Angabe werden alle Messungen ab dem frühesten Datum ausgewertet; beide Skripte verhalten sich dabei identisch. Weicht das früheste Datum auffällig weit ab (mehr als 90 Tage vor der nächsten Messung, ein typischer Datums-Tippfehler wie ein falsches Jahr), geben beide eine Warnung aus.
@@ -135,12 +149,66 @@ python3 generate_bp_daytime_tikz.py --csv iBP_Readings.csv --date-from 2026-05-1
 
 Mit `--fences` markiert in Abb. 2a/2b ein kurzer waagrechter Strich über jeder Säule die **obere Tukey-Grenze** (Q3+1,5·IQR): Werte oberhalb dieses Strichs sind die als Kreis markierten Ausreißer nach oben. (Achtung: `--pulse` mit zwei Bindestrichen; `-pulse` ist ein argparse-Fehler.)
 
+## Komplettlauf – `bp_build.py`
+
+Statt beide Generatoren und anschließend mehrfach `pdflatex` von Hand aufzurufen, erledigt `bp_build.py` den gesamten Ablauf für eine oder mehrere Personen. Die Aufrufe stehen in der Tabelle `PERSONEN` am Kopf des Skripts; die mitgelieferte Fassung ist eine **Vorlage mit zwei Beispielpersonen** und wird für den eigenen Gebrauch angepasst.
+
+```bash
+python3 bp_build.py Eva              # eine Person
+python3 bp_build.py Eva Adam         # mehrere nacheinander
+python3 bp_build.py --alle           # alle konfigurierten Personen
+python3 bp_build.py --liste          # Konfiguration und Dateistand anzeigen
+python3 bp_build.py Eva --keep-aux   # LaTeX-Hilfsdateien behalten
+```
+
+Das Skript wartet mit `subprocess.run()` garantiert auf das Ende jedes Schritts und prüft anschließend, ob die erwartete Datei wirklich existiert. Das ist der Grund für ein Python-Skript statt einer Befehlsliste: In a-Shell kehrt der Prompt teilweise zurück, bevor der vorherige Prozess seine Dateien fertig geschrieben hat, sodass `pdflatex` auf einer unvollständigen `.tex`-Datei startet. Nach erfolgreichem Lauf werden die LaTeX-Hilfsdateien entfernt; im Fehlerfall bleiben sie zur Diagnose liegen.
+
+## Bestand und App-Export zusammenführen – `bp_merge.py`
+
+Wer die Messungen bisher in einer Tabellenkalkulation gepflegt hat und ab einem Stichtag auf eine App umsteigt, steht vor einem Problem: Die App exportiert bei jedem Mal ihren **kompletten** Bestand, nicht nur die Neuzugänge. Einfaches Anhängen erzeugt deshalb bei jedem Lauf Dubletten.
+
+`bp_merge.py` hängt nicht an, sondern baut die Datei jedes Mal neu auf:
+
+```
+CSV = Bestand (Tage VOR dem Stichtag) + App-Export (Tage AB dem Stichtag)
+```
+
+Der Stichtag ist der Tag der Umstellung und bleibt für immer derselbe. Dubletten sind dadurch konstruktiv ausgeschlossen — die beiden Quellen können sich taggenau nicht überlappen — und der Lauf ist beliebig wiederholbar: Zweimal aufgerufen entsteht dieselbe Datei.
+
+```bash
+python3 bp_merge.py --csv readings.csv --app Blutdruck_09_08_2026.csv --ab 2026-08-09
+python3 bp_merge.py --csv readings.csv --app "Blutdruck_*.csv" --ab 2026-08-09 --probelauf
+```
+
+Zum Ausprobieren liegen zwei synthetische Dateien bei:
+
+```bash
+cp examples/merge_bestand_example.csv arbeit.csv
+python3 bp_merge.py --csv arbeit.csv --app examples/merge_app_export_example.csv --ab 2026-08-09
+```
+
+Eigenschaften im Einzelnen:
+
+- **Formate gemischt erlaubt.** Bestand und Export dürfen unterschiedliche Formate haben (klassischer iBP-Export oder Spalten-CSV mit Komma, Semikolon oder Tabulator). Die Spaltenzuordnung erfolgt über die Namen, die Reihenfolge ist frei; für den Puls werden unter anderem `Pul`, `Puls`, `Pulse`, `HR` und `BPM` akzeptiert.
+- **Kanonische Ausgabe** `Datum;Zeit;Systolisch;Diastolisch;Puls;Notiz`. Diese Kopfzeile enthält bewusst **nicht** die Begriffe `Mean Arterial Pressure`/`Pulse Pressure`, die in beiden Generatoren die positionsbasierte iBP-Normalisierung auslösen — die Spaltenreihenfolge bleibt dadurch dauerhaft unkritisch.
+- **Korrekturen kommen mit.** Wird eine Messung in der App nachträglich geändert oder gelöscht, wirkt sich das beim nächsten Lauf aus, weil der Bereich ab dem Stichtag neu aufgebaut wird. Der Bereich davor wird nie angetastet.
+- **Schutzmechanismen.** Beim Schreiben in dieselbe Datei ist `--ab` Pflicht (ein automatisch abgeleiteter Stichtag würde mitwandern). Vor dem Schreiben entsteht eine Sicherungskopie `<datei>.bak-JJJJMMTT-HHMMSS`, geschrieben wird atomar über `os.replace`. Enthält der Export keine Messung ab dem Stichtag, oder fehlen darin Tage, die in der Datei bereits stehen (Hinweis auf einen veralteten Export), bricht das Skript ab, statt Messungen zu löschen. Nach dem Schreiben wird die Datei erneut eingelesen und mit dem berechneten Ergebnis verglichen.
+- **Dateimuster.** Weil viele Apps das Exportdatum in den Dateinamen schreiben, akzeptiert `--app` ein Muster wie `Blutdruck_*.csv`; verwendet wird die zuletzt geänderte passende Datei, bei mehreren Treffern werden alle mit Zeitstempel genannt.
+
+Über `--person NAME` holt sich `bp_merge.py` Datei, Export-Muster und Stichtag aus der `PERSONEN`-Tabelle von `bp_build.py`; Personen ohne `merge`-Eintrag brauchen keinen Neuaufbau. In `bp_build.py` läuft der Schritt automatisch vor den Generatoren und lässt sich mit `--kein-merge` überspringen.
+
 ## Alle Optionen
 
 - [`docs/optionen_bp_tikz.csv`](docs/optionen_bp_tikz.csv) – vollständige Optionstabelle für `generate_bp_tikz.py`.
 - [`docs/optionen_daytime.csv`](docs/optionen_daytime.csv) – Optionstabelle für `generate_bp_daytime_tikz.py`.
+- [`docs/optionen_merge.csv`](docs/optionen_merge.csv) – Optionstabelle für `bp_merge.py`.
+- [`docs/Manual_Merge_DE.md`](docs/Manual_Merge_DE.md) – Ablauf, Beispiele und Grenzfälle des Zusammenführens.
 
-Beide Skripte zeigen mit `--help` zusätzlich Anwendungsbeispiele.
+Alle Skripte zeigen mit `--help` zusätzlich Anwendungsbeispiele.
+
+## Hinweis zu echten Messdaten
+
+Im Repository liegen ausschließlich **synthetische** Beispieldateien unter `examples/`. Die `.gitignore` schließt reale Messdaten (`*_Readings*.csv`, `iBP_*.csv`, `Blutdruck_*.csv`, Sicherungskopien) und eine persönliche Konfiguration (`bp_build_local.py`) aus. Vor einem Push mit `git status` prüfen, dass keine echten Gesundheitsdaten aufgenommen werden.
 
 ## Anforderungen
 

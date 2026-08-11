@@ -1,0 +1,8 @@
+Option,Pflicht,Standard bei Minimalaufruf,Grund / Zweck,Beispiel
+--csv CSV,"ja (oder --person)",,"Die vollstaendige CSV. Sie liefert die Tage VOR dem Stichtag und wird ohne --aus an Ort und Stelle neu geschrieben.",--csv readings.csv
+--app CSV,"ja (oder --person)",,"Vollstaendiger Export der App. Liefert die Tage AB dem Stichtag. Ein Dateimuster ist erlaubt; verwendet wird die zuletzt geaenderte passende Datei.",--app Blutdruck_*.csv
+--ab DATUM,"ja beim Schreiben in dieselbe Datei","Tag nach der letzten Messung in --csv","Stichtag = Tag der Umstellung auf die App. Bleibt fuer immer derselbe. Beim Schreiben in dieselbe Datei Pflicht, weil ein abgeleiteter Stichtag nach jedem Lauf mitwandern und die App-Daten einfrieren wuerde.",--ab 2026-08-09
+--person NAME,nein,,"Holt CSV, App-Muster und Stichtag aus der PERSONEN-Tabelle von bp_build.py (Eintrag 'merge'). Personen ohne diesen Eintrag brauchen keinen Neuaufbau.",--person Adam
+--aus CSV,nein,"= --csv (an Ort und Stelle)","Abweichende Zieldatei. Ohne Angabe wird --csv selbst neu geschrieben, mit vorheriger Sicherungskopie.",--aus master_neu.csv
+--probelauf,nein,aus,"Nur pruefen und anzeigen, was entstuende; es wird nichts geschrieben.",--probelauf
+--version,nein,,"Versionsnummer ausgeben und beenden.",--version
